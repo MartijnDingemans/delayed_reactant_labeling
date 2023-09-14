@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "drlpy"
+version = "0.0.1"
+authors = [
+    {name="Martijn Dingemans", email="Martijn.Dingemans@ru.nl"},
+    {name="Matthijs Hellinghuizen", email="matthijs.hellinghuizen@ru.nl"}
+]
+description = "README.txt"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/"
