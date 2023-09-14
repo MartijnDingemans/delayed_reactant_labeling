@@ -4,12 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "drlpy"
-version = "0.0.1"
+version = "0.0.2"
 authors = [
     {name="Martijn Dingemans", email="Martijn.Dingemans@ru.nl"},
     {name="Matthijs Hellinghuizen", email="matthijs.hellinghuizen@ru.nl"}
 ]
-description = "README.txt"
+description = "A toolbox for analysis of Delayed Reactant Labeling experiments."
+readme = "README.txt"
 requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Python :: 3",
