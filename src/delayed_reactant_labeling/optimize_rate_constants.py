@@ -8,7 +8,7 @@ import pandas as pd
 from datetime import datetime
 from sklearn.decomposition import PCA
 from tqdm import tqdm
-from drlpy.delayed_reactant_labeling import Experimental_Conditions
+from delayed_reactant_labeling.delayed_reactant_labeling import Experimental_Conditions
 
 
 class JSON_log:
@@ -260,6 +260,7 @@ class Visualize_Rate_Constants:
                  progress: load_nelder_mead_progress,
                  create_prediction: Optional[Callable] = None,
                  calculate_individual_error: Optional[Callable] = None,
+                 calculate_total_error: Optional[Callable] = None,
                  experimental: Optional[pd.DataFrame] = None,
                  experimental_conditions: Experimental_Conditions = None,
                  isomers: Optional[list[str]] = None,
@@ -271,6 +272,7 @@ class Visualize_Rate_Constants:
         self._prediction = None
         self.create_prediction = create_prediction
         self.calculate_individual_error = calculate_individual_error
+        self.calculate_total_error = calculate_total_error
         self.experimental = experimental
         self.experimental_conditions = experimental_conditions
 
@@ -454,8 +456,8 @@ class Visualize_Rate_Constants:
         fig.savefig(f"{self.path}path_in_pca_space.svg", dpi=1000)
         return fig, [ax, ax_pc0, ax_pc1]
 
-    def show_error_contributions(self, calculate_total_error: Callable) -> (plt.Figure, plt.Axes):
-        total_error, ratio, fig, ax = calculate_total_error(self.progress.best_rates, create_plot=True)
+    def show_error_contributions(self) -> (plt.Figure, plt.Axes):
+        total_error, ratio, fig, ax = self.calculate_total_error(self.progress.best_rates, create_plot=True)
         ax.set_title(f"{self.description}\ntotal MAE: {total_error:.3f}")
         fig.tight_layout()
         fig.show()
@@ -600,92 +602,42 @@ class Visualize_Rate_Constants:
         clip = moviepy.video.io.ImageSequenceClip.ImageSequenceClip(files, fps=fps)
         clip.write_videofile(f"{self.path}visualized_rate_over_time.mp4")
 
+    def show_rate_sensitivity(self,
+                              k_multiplier=np.linspace(0.5, 1.5, 11),
+                              threshold=5,
+                              plot_first_order_interactions=False) -> (plt.Figure, plt.Axes):
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-"""
-fig, axs = plt.subplots(3, figsize=(11, 11))
-experimental = experimental.iloc[-len(prediction):, :]
-time = experimental["time (min)"]
-for ax, intermediate in zip(axs, ["1", "2", "3"]):
-    ax.scatter(time, experimental[f"{intermediate}"], color="tab:blue", alpha=0.3, s=1)
-    ax.scatter(time, experimental[f"{intermediate}'"], color="tab:gray", alpha=0.3, s=1)
-    ax.set_ylabel("experimental intensity (a.u.)")
-    ax.set_xlabel("time (min)")
-    ax.set_xlim(left=0.2)
-    ax.set_ylim(bottom=0)
-    height_exp = experimental[f"{intermediate}"].iloc[-200:].mean()
+        errors = np.full((len(k_multiplier), len(self.progress.best_rates)), np.nan)
+        for col, (k, rate) in enumerate(tqdm(self.progress.best_rates.items())):
+            adjusted_rates = k_multiplier * rate
+            for row, adjusted_rate in enumerate(adjusted_rates):
+                rates = self.progress.best_rates.copy()
+                rates[k] = adjusted_rate
+                errors[row, col] = self.calculate_total_error(rates)[0]
 
-    ax2 = ax.twinx()
-    ax2.plot(time, prediction[f"{intermediate}"], color="tab:blue", label=f"{intermediate}")
-    ax2.plot(time, prediction[f"{intermediate}'"], color="tab:gray", label=f"{intermediate}'")
+        fig, ax = plt.subplots()
+        errors[errors > threshold * errors.min()] = threshold * errors.min()
+        im = ax.imshow(errors)
 
-    yl, yu = ax2.get_ylim()
-    height_pred = prediction[f"{intermediate}"].iloc[-200:].mean()
-    ax2.set_ylim(bottom=0, top=yu * ((height_pred / yu) / (height_exp / ax.get_ylim()[1])))
-    ax.set_title(f"intensity / M = {height_exp / height_pred:.2e}")
+        ticks = self.progress.best_rates.index
+        ax.set_xticks(np.arange(len(ticks)), ticks, fontsize="small")
 
-    ax2.legend()
-    ax2.set_ylabel("predicted concentration (M)")
-fig.tight_layout()
-fig.show()
-fig.savefig(f"{path}intensities_over_time.png", dpi=1000)
-"""
+        ind = np.linspace(0, len(k_multiplier), 5).round(0).astype(int)
+        ax.set_yticks(ind, k_multiplier[ind].round(1))
 
+        ax.set_ylabel("multiplier of k")
 
-def permute_rates(
-        path: str,
-        method_description: str,
-        experimental: pd.DataFrame,
-        progress: load_nelder_mead_progress,
-        compare_data: Callable,
-        create_prediction: Callable,
-        metric: Callable,
-        steps: np.array = np.linspace(0, 2, 21),
-):
-    from mpl_toolkits.axes_grid1 import make_axes_locatable
-    errors = []
-    for k, rate in progress.best_rates.items():
-        adjusted_rates = steps * rate
-        error_k = []
-        for adjusted_k_rate in adjusted_rates:
-            # recompute the best prediction so that we can make plots of it.
-            rates = progress.best_rates
-            rates[k] = adjusted_k_rate
-            _experimental, prediction = create_prediction(_rate_constants=rates)
-            all_errors = compare_data(_experimental, prediction, metric)
-            errors_at_5min = compare_data(_experimental[_experimental["time (min)"].between(0, 5)],
-                                          prediction[prediction["time (min)"].between(0, 5)],
-                                          metric)
-            # replace np.inf with a large value
-            for key, value in all_errors.items():
-                if np.isinf(value):
-                    all_errors[key] = 1e3
-            for key, value in errors_at_5min.items():
-                if np.isinf(value):
-                    errors_at_5min[key] = 1e3
-            total_error = sum([all_errors.sum(), errors_at_5min.sum()])
-            print(f"{k} with modification of {adjusted_k_rate:.2f} has a total error of {total_error:.2f}")
-            error_k.append(total_error)
-        errors.append(pd.Series(error_k, index=steps, name=k))
-    errors = pd.DataFrame(errors)
-    errors.to_excel(f"{path}sensitivity_of_k_to_permutations.xlsx")
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", "5%", pad="3%")
+        fig.colorbar(im, cax=cax, label="MAE")
+        ax.set_title(f"{self.method_description}")
+        fig.tight_layout()
+        fig.show()
+        fig.savefig(f"{self.path}sensitivity_of_k_to_permutations.png", dpi=1000)
+        fig.savefig(f"{self.path}sensitivity_of_k_to_permutations.svg", dpi=1000)
 
-    fig, ax = plt.subplots()
-    _errors = errors.copy()
-    _errors[_errors > 0.8] = 0.8
-    im = ax.imshow(_errors)
+        if plot_first_order_interactions:
+            raise NotImplementedError
 
-    ticks = progress.best_rates.index
-    x = np.arange(len(ticks))
-    ax.set_yticks(x, ticks, fontsize="small")
-    ax.set_xticks([0, 5, 10, 15, 20], [0, 50, 100, 150, 200])
-    ax.set_xlabel("value of k (%)")
-
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", "5%", pad="3%")
-    cbar = fig.colorbar(im, cax=cax)
-    cbar.set_label("sum of MAE")
-    ax.set_title(f"{method_description}")
-    fig.tight_layout()
-    fig.show()
-    fig.savefig(f"{path}sensitivity_of_k_to_permutations.png", dpi=1000)
-    fig.savefig(f"{path}sensitivity_of_k_to_permutations.svg", dpi=1000)
+        return fig, ax

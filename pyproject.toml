@@ -3,8 +3,8 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "delayed_reactant_labeling"
-version = "0.0.2"
+name = "delayed-reactant-labeling"
+version = "0.0.3"
 authors = [
     {name="Martijn Dingemans", email="Martijn.Dingemans@ru.nl"},
     {name="Matthijs Hellinghuizen", email="matthijs.hellinghuizen@ru.nl"}
