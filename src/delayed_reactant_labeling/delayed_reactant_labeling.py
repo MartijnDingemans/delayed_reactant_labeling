@@ -55,6 +55,11 @@ class DRL:
         self.reaction_products = List()  # add
 
         for k, reactants, products in reactions:
+            if rates[k] == 0:
+                # the reaction does not create or consume any chemicals, therefore its redundant and can be removed for
+                # computational benefits
+                continue
+
             # human-readable string, machine executable function
             self.rate_equations.append(f"{k}*" + "*".join([f"[{reactant}]" for reactant in reactants]))
             self.reaction_rate.append(rates[k])
@@ -157,63 +162,149 @@ class DRL:
         return _experimental, _prediction
 
 
-"""
 def main():
-    # compare our results with Roelant
-    import drl_utilities.reaction_roelant as reaction_roelant
-    path = "../experiments/MAH174/labeled_aldehyde_Roelant_data/images/original_rate_constants/numba_attempt_"
+    """Compare the results found using the DRL class with the original excel sheet from Roelant et al."""
 
-    drl = DRL(reactions=reaction_roelant.reactions_twoway,
-              rates=reaction_roelant.rate_constants)
+    REACTIONS_ONEWAY = [
+        # unlabeled
+        ("k1_D", ["cat", "2", ], ["3D", ]),
+        ("k1_E", ["cat", "2", ], ["3E", ]),
+        ("k1_F", ["cat", "2", ], ["3F", ]),
 
-    # use the same time span as he did for the predictions!
-    roelant_prediction_pre_addition = pd.read_excel("E:/DRL/show_case/predicted_DRL_ORIGINAL_pre_addition.xlsx")[
-        "time (min)"].to_numpy()
-    roelant_prediction_post_addition = pd.read_excel("E:/DRL/show_case/predicted_DRL_ORIGINAL_post_addition.xlsx")[
-        "time (min)"].to_numpy()
+        ("k2_D", ["3D", ], ["4D", ]),
+        ("k2_E", ["3E", ], ["4E", ]),
+        ("k2_F", ["3F", ], ["4F", ]),
 
-    exp_conditions = Experimental_Conditions(
-        time=(roelant_prediction_pre_addition, roelant_prediction_post_addition,),
-        initial_concentrations=reaction_roelant.initial_concentration,
-        dilution_factor=1200 / 2000,
-        labeled_reactant={"2'": 0.005 * 800 / 2000},
+        ("k3_D", ["4D", ], ["5D", ]),
+        ("k3_E", ["4E", ], ["5E", ]),
+        ("k3_F", ["4F", ], ["5F", ]),
+
+        ("k4_D", ["5D", ], ["6D", "cat", ]),
+        ("k4_E", ["5E", ], ["6E", "cat", ]),
+        ("k4_F", ["5F", ], ["6F", "cat", ]),
+
+        # labeled
+        ("k1_D", ["cat", "2'", ], ["3D'", ]),
+        ("k1_E", ["cat", "2'", ], ["3E'", ]),
+        ("k1_F", ["cat", "2'", ], ["3F'", ]),
+
+        ("k2_D", ["3D'", ], ["4D'", ]),
+        ("k2_E", ["3E'", ], ["4E'", ]),
+        ("k2_F", ["3F'", ], ["4F'", ]),
+
+        ("k3_D", ["4D'", ], ["5D'", ]),
+        ("k3_E", ["4E'", ], ["5E'", ]),
+        ("k3_F", ["4F'", ], ["5F'", ]),
+
+        ("k4_D", ["5D'", ], ["6D'", "cat", ]),
+        ("k4_E", ["5E'", ], ["6E'", "cat", ]),
+        ("k4_F", ["5F'", ], ["6F'", "cat", ]),
+    ]
+
+    def create_reactions_twoway():
+        """
+        Create the reverse reaction of each pre-defined reaction.
+
+        Removes the first character of each rate constant name (should be "k"), and adds to the list of reactions a new reaction with "k-" in front of the name, with the products and reactants reversed."""
+        reactions_twoway_labeled = deepcopy(REACTIONS_ONEWAY)
+        for k, reactants, products in REACTIONS_ONEWAY:
+            reactions_twoway_labeled.append(("k-" + k[1:], products, reactants))
+
+        return reactions_twoway_labeled
+
+    reaction_equations = create_reactions_twoway()
+
+    EXPERIMENTAL_DATA_PATH = "../../experimental_data_Roelant.xlsx"  # the absolute path can also be given
+    experimental = pd.read_excel(EXPERIMENTAL_DATA_PATH)
+    time = experimental["time (min)"]
+    assert time.is_monotonic_increasing
+
+    CONCENTRATIONS_INITIAL = {"cat": 0.005 * 40 / 1200,  # concentration in M
+                              "2": 0.005 * 800 / 1200}
+    CONCENTRATION_LABELED_REACTANT = {"2'": 0.005 * 800 / 2000}
+    DILLUTION_FACTOR = 1200 / 2000
+
+    TIME_OF_ADDITION_LABELED_COMPOUND = 10.  # in minutes; start of DRL curves
+    index_labeled_compound = np.argmax(experimental["time (min)"] > TIME_OF_ADDITION_LABELED_COMPOUND)
+
+    experimental_conditions = Experimental_Conditions(
+        time=(experimental["time (min)"].iloc[:index_labeled_compound].to_numpy(),
+              experimental["time (min)"].iloc[index_labeled_compound:].to_numpy()),
+        initial_concentrations=CONCENTRATIONS_INITIAL,
+        dilution_factor=DILLUTION_FACTOR,
+        labeled_reactant=CONCENTRATION_LABELED_REACTANT,
     )
-    _prediction_unlabeled, _prediction_labeled = drl.predict_concentration(exp_conditions)
+
+    rate_constants = {
+        "k1_D": 1.5,
+        "k1_E": 0.25,
+        "k1_F": 0.01,
+        "k2_D": 0.43,
+        "k2_E": 0.638,
+        "k2_F": 0.567,
+        "k3_D": 0.23,
+        "k3_E": 0.35,
+        "k3_F": 0.3,
+        "k4_D": 8,
+        "k4_E": 0.05,
+        "k4_F": 0.03,
+        "k-1_D": 0,
+        "k-1_E": 0,
+        "k-1_F": 0,
+        "k-2_D": 0.025,
+        "k-2_E": 0.035,
+        "k-2_F": 0.03,
+        "k-3_D": 0,
+        "k-3_E": 0,
+        "k-3_F": 0,
+        "k-4_D": 0,
+        "k-4_E": 0,
+        "k-4_F": 0,
+    }
+    rate_constants = pd.Series(rate_constants)
+
+    from timeit import default_timer
+
+    t = default_timer()
+    for i in range(1):
+        drl = DRL(reactions=reaction_equations,
+                  rates=rate_constants)
+        _prediction_unlabeled, _prediction_labeled = drl.predict_concentration(experimental_conditions)
+    print(f"this took {default_timer()-t:.2f} seconds")
 
     def verify_results(data_me: pd.DataFrame,
                        data_original: pd.DataFrame,
                        metric: any,
                        skip_label: bool = False):
-        compounds = {"cat": "1", "2": "2", "2'": "2'", "6B": "R-6", "6B'": "R-6'", "6C": "S-6", "6C'": "S-6'"}
-        for p in ["A", "B", "C"]:
-            for intermediate in ["3", "4", "5", "5"]:
-                for label in ["", "'"]:
-                    compounds[f"{intermediate}{p}{label}"] = f"{intermediate}{p}{label}"
 
         data_original = data_original.copy()
-        data_original.columns = [str(col).strip() for col in data_original.columns]
+        data_original.columns = [str(column) for column in data_original.columns]
         data_original["time (min)"] = data_original["time (min)"] - data_original["time (min)"][0]
 
         _diff = {}
-        for compound_me, compound_they in compounds.items():
-            if skip_label is True and compound_me[-1] == "'":
+        for compound in data_me:
+            if skip_label is True and compound[-1] == "'":
                 continue
-            y_true = data_original[compound_they]
-            y_pred = data_me[compound_me]
-            error = metric(y_true=y_true, y_pred=y_pred)
-            print(f"{compound_me} has a {metric.__name__} of {error:.6f}")
+            elif compound[:2] == "6F":
+                continue
+            elif compound == "time (min)":
+                continue
+            y_true = data_original[compound]
+            y_pred = data_me[compound]
+            error = metric(y_true=y_true[:-1], y_pred=y_pred)
+            print(f"{compound} has a {metric.__name__} of \t{error:.6e}")
             y = (y_pred - y_true) / y_true * 100
-            ax.plot(y, label=compound_me)
+            ax.plot(y, label=compound)
+        ax.set_ylabel("relative error\n(Ypython - Yroelant)/Yroelant*100 (%)")
         ax.legend()
         ax.set_title("prediction Roelant - prediction python")
         fig.show()
-        fig.savefig(f"{path}verify_results_label_{not skip_label}.png", dpi=1000)
 
     print("------------pre-------------")
     fig, ax = plt.subplots(1, 1, figsize=(8.5, 11.5))
     verify_results(
         data_me=_prediction_unlabeled,
-        data_original=pd.read_excel("E:/DRL/show_case/predicted_DRL_ORIGINAL_pre_addition.xlsx"),
+        data_original=pd.read_excel("../../predicted_DRL_ORIGINAL_pre_addition.xlsx"),
         skip_label=True,
         metric=mean_absolute_error
     )
@@ -221,105 +312,11 @@ def main():
     fig, ax = plt.subplots(1, 1, figsize=(8.5, 11.5))
     verify_results(
         data_me=_prediction_labeled,
-        data_original=pd.read_excel("E:/DRL/show_case/predicted_DRL_ORIGINAL_post_addition.xlsx"),
+        data_original=pd.read_excel("../../predicted_DRL_ORIGINAL_post_addition.xlsx"),
         skip_label=False,
         metric=mean_absolute_error
     )
 
-    # load experimental data, make sure it is aligned correctly.
-    experimental = pd.read_excel("E:/DRL/show_case/ORIGINAL_experimental_data.xlsx")
-    experimental.columns = [str(col).strip().upper() for col in experimental.columns]
-    experimental.rename(columns={"TIME (MIN)": "time (min)"}, inplace=True)
-    experimental["time (min)"] = experimental["time (min)"] + roelant_prediction_pre_addition[-1]
-
-    # repeat the DRL prediction step, this time utilizing the same time steps as the measured spectra frames
-    # in the Excel sheet the two time steps do NOT align. Try to work around it as much as possible.
-    exp_conditions.time = (roelant_prediction_pre_addition, experimental["time (min)"].to_numpy())
-
-    _prediction_unlabeled, _prediction_labeled = drl.predict_concentration(exp_conditions)
-    experimental, _prediction_labeled = drl.format_last_slice(experimental, _prediction_labeled)
-
-    print("calculating errors p2")
-    errors, (fig_iso, axs_iso), (fig_lab, axs_lab) = reaction_roelant.compare_data(
-        experimental,
-        _prediction_labeled,
-        mean_absolute_error,
-        plot_label_ratio=True,
-        plot_isomer_ratio=True)
-
-    errors_at_5min = reaction_roelant.compare_data(experimental[experimental["time (min)"].between(0, 5)],
-                                                   _prediction_labeled[_prediction_labeled["time (min)"].between(0, 5)],
-                                                   mean_absolute_error)
-    # replace np.inf with a large value
-    for key, value in errors.items():
-        if np.isinf(value):
-            errors[key] = 1e3
-    for key, value in errors_at_5min.items():
-        if np.isinf(value):
-            errors_at_5min[key] = 1e3
-
-    # show a bar plot of all error contributions
-    error_all = pd.DataFrame([errors, errors_at_5min], index=["all", "first 5 minutes"])
-    descr = f"original rate constants, sum(MAE) = {np.sum(error_all.sum().sum()):.2f}"
-    fig, ax = plt.subplots()
-    error_all.T.plot.bar(ax=ax)
-    ax.set_title(descr)
-    ax.set_xlabel("error type")
-    ax.set_ylabel("MAE")
-    fig.tight_layout()
-    fig.show()
-    fig.savefig(f"{path}bar_plot_of_all_errors.png", dpi=1000)
-
-    fig_lab.tight_layout()
-    fig_lab.show()
-    for ax in axs_lab:
-        ax.legend()
-    fig_lab.savefig(f"{path}_fit_with_labeled.png", dpi=1000)
-
-    axs_iso[0].legend()
-    axs_iso[1].legend()
-    fig_iso.tight_layout()
-    fig_iso.show()
-    fig_iso.savefig(f"{path}_fit_between_isomers.png", dpi=1000)
-
-    time = experimental["time (min)"]
-    fig, axs = plt.subplots(3, 2, figsize=(11, 11))
-    for axs_row, isomer in zip(axs, ["A", "B", "C"]):
-        for ax, compound in zip(axs_row, ["3", "5"]):
-            ax.scatter(time, experimental[f"{compound}{isomer}"], color="tab:blue", alpha=0.3, s=1)
-            ax.scatter(time, experimental[f"{compound}{isomer}'"], color="tab:gray", alpha=0.3, s=1)
-            ax.set_ylabel("experimental intensity (a.u.)")
-            ax.set_xlabel("time (min)")
-            ax.set_xlim(left=0.2)
-            ax.set_ylim(bottom=0)
-            height_exp = experimental[f"{compound}{isomer}"].iloc[200:].mean()
-
-            ax2 = ax.twinx()
-            if compound == "3":
-                pred = _prediction_labeled[f"3{isomer}"]
-                ax2.plot(time, _prediction_labeled[f"3{isomer}"], color="tab:blue", label=f"3{isomer}")
-                ax2.plot(time, _prediction_labeled[f"3{isomer}'"], color="tab:gray", label=f"3{isomer}'")
-            else:
-                pred = 0.025 * _prediction_labeled[f"4{isomer}"] + _prediction_labeled[f"5{isomer}"]
-                ax2.plot(time, 0.025 * _prediction_labeled[f"4{isomer}"] + _prediction_labeled[f"5{isomer}"],
-                         color="tab:blue",
-                         label=f"4{isomer} / 5{isomer}")
-                ax2.plot(time, 0.025 * _prediction_labeled[f"5{isomer}'"] + _prediction_labeled[f"5{isomer}'"],
-                         color="tab:gray", label=f"4{isomer}' / 5{isomer}'")
-
-            yl, yu = ax2.get_ylim()
-            height_pred = pred.iloc[200:].mean()
-            ax2.set_ylim(bottom=0, top=yu * ((height_pred / yu) / (height_exp / ax.get_ylim()[1])))
-            ax.set_title(f"intensity / M = {height_exp / height_pred:.2e}")
-
-            ax2.legend()
-            ax2.set_ylabel("predicted concentration (M)")
-    fig.tight_layout()
-    fig.show()
-    fig.savefig(f"{path}intensities_over_time")
-
 
 if __name__ == "__main__":
     main()
-    print("done and gone")
-"""

@@ -607,10 +607,12 @@ class Visualize_Rate_Constants:
                               threshold=5) -> (plt.Figure, plt.Axes):
         from mpl_toolkits.axes_grid1 import make_axes_locatable
 
+        ticks = self.progress.best_rates.copy()  # when a rate is zero, remove it
+        col = 0  # tracker here because some columns get skipped
         errors = np.full((len(k_multiplier), len(self.progress.best_rates)), np.nan)
-        for col, (k, rate) in enumerate(tqdm(self.progress.best_rates.items())):
+        for (k, rate) in tqdm(self.progress.best_rates.items()):
             if rate == 0:
-                errors[:, col] = np.nan
+                del ticks[k]
                 continue
 
             adjusted_rates = k_multiplier * rate
@@ -618,13 +620,13 @@ class Visualize_Rate_Constants:
                 rates = self.progress.best_rates.copy()
                 rates[k] = adjusted_rate
                 errors[row, col] = self.calculate_total_error(rates)[0]
+            col += 1
 
         fig, ax = plt.subplots()
         errors[errors > threshold * errors.min()] = threshold * errors.min()
         im = ax.imshow(errors, origin="lower")
 
-        ticks = self.progress.best_rates.index
-        ax.set_xticks(np.arange(len(ticks)), ticks, fontsize="small")
+        ax.set_xticks(np.arange(len(ticks)), ticks.index, fontsize="small")
         ax.tick_params(axis='x', rotation=45)
 
         ind = np.linspace(0, len(k_multiplier)-1, 5).round(0).astype(int)
