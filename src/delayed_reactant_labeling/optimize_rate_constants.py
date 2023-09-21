@@ -604,12 +604,15 @@ class Visualize_Rate_Constants:
 
     def show_rate_sensitivity(self,
                               k_multiplier=np.linspace(0.5, 1.5, 11),
-                              threshold=5,
-                              plot_first_order_interactions=False) -> (plt.Figure, plt.Axes):
+                              threshold=5) -> (plt.Figure, plt.Axes):
         from mpl_toolkits.axes_grid1 import make_axes_locatable
 
         errors = np.full((len(k_multiplier), len(self.progress.best_rates)), np.nan)
         for col, (k, rate) in enumerate(tqdm(self.progress.best_rates.items())):
+            if rate == 0:
+                errors[:, col] = np.nan
+                continue
+
             adjusted_rates = k_multiplier * rate
             for row, adjusted_rate in enumerate(adjusted_rates):
                 rates = self.progress.best_rates.copy()
@@ -618,26 +621,24 @@ class Visualize_Rate_Constants:
 
         fig, ax = plt.subplots()
         errors[errors > threshold * errors.min()] = threshold * errors.min()
-        im = ax.imshow(errors)
+        im = ax.imshow(errors, origin="lower")
 
         ticks = self.progress.best_rates.index
         ax.set_xticks(np.arange(len(ticks)), ticks, fontsize="small")
+        ax.tick_params(axis='x', rotation=45)
 
-        ind = np.linspace(0, len(k_multiplier), 5).round(0).astype(int)
-        ax.set_yticks(ind, k_multiplier[ind].round(1))
+        ind = np.linspace(0, len(k_multiplier)-1, 5).round(0).astype(int)
+        ax.set_yticks(ind, k_multiplier[ind].round(2))
 
         ax.set_ylabel("multiplier of k")
 
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", "5%", pad="3%")
         fig.colorbar(im, cax=cax, label="MAE")
-        ax.set_title(f"{self.method_description}")
+        ax.set_title(f"{self.description}")
         fig.tight_layout()
         fig.show()
-        fig.savefig(f"{self.path}sensitivity_of_k_to_permutations.png", dpi=1000)
-        fig.savefig(f"{self.path}sensitivity_of_k_to_permutations.svg", dpi=1000)
-
-        if plot_first_order_interactions:
-            raise NotImplementedError
+        fig.savefig(f"{self.path}sensitivity_of_rate.png", dpi=1000)
+        fig.savefig(f"{self.path}sensitivity_of_rate.svg", dpi=1000)
 
         return fig, ax
