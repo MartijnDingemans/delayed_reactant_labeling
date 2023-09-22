@@ -610,7 +610,7 @@ class Visualize_Rate_Constants:
         ticks = self.progress.best_rates.copy()  # when a rate is zero, remove it
         col = 0  # tracker here because some columns get skipped
         errors = np.full((len(k_multiplier), len(self.progress.best_rates)), np.nan)
-        for (k, rate) in tqdm(self.progress.best_rates.items()):
+        for col, (k, rate) in enumerate(tqdm(self.progress.best_rates.items())):
             if rate == 0:
                 del ticks[k]
                 continue
@@ -620,7 +620,8 @@ class Visualize_Rate_Constants:
                 rates = self.progress.best_rates.copy()
                 rates[k] = adjusted_rate
                 errors[row, col] = self.calculate_total_error(rates)[0]
-            col += 1
+
+        errors = errors[:, ~np.isnan(errors[0, :])]
 
         fig, ax = plt.subplots()
         errors[errors > threshold * errors.min()] = threshold * errors.min()
@@ -629,7 +630,7 @@ class Visualize_Rate_Constants:
         ax.set_xticks(np.arange(len(ticks)), ticks.index, fontsize="small")
         ax.tick_params(axis='x', rotation=45)
 
-        ind = np.linspace(0, len(k_multiplier)-1, 5).round(0).astype(int)
+        ind = np.linspace(0, len(k_multiplier) - 1, 5).round(0).astype(int)
         ax.set_yticks(ind, k_multiplier[ind].round(2))
 
         ax.set_ylabel("multiplier of k")
