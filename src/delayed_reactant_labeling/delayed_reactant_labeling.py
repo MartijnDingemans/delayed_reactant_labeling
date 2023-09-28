@@ -35,7 +35,7 @@ def calculate_step(reaction_rate, reaction_reactants, reaction_products, delta_t
 class DRL:
     def __init__(self,
                  reactions: list[tuple[str, list[str], list[str]]],
-                 rates: dict[str: float]):
+                 rate_constants: dict[str: float]):
 
         # link the name of a chemical with an index
         self.reference = set()
@@ -48,26 +48,24 @@ class DRL:
         # store the last used time slice
         self.time = None
 
-        # construct the list of indexes of reactants and products per reaction
-        self.rate_equations = []  # only for us mere humans
+        # construct a list containing the indices of all the reactants and products per reaction
         self.reaction_rate = []  # np array at the end
         self.reaction_reactants = List()  # multiply everything per reaction, and multiply by k
         self.reaction_products = List()  # add
 
         for k, reactants, products in reactions:
-            if rates[k] == 0:
+            if rate_constants[k] == 0:
                 # the reaction does not create or consume any chemicals, therefore its redundant and can be removed for
                 # computational benefits
                 continue
 
             # human-readable string, machine executable function
-            self.rate_equations.append(f"{k}*" + "*".join([f"[{reactant}]" for reactant in reactants]))
-            self.reaction_rate.append(rates[k])
+            self.reaction_rate.append(rate_constants[k])
             self.reaction_reactants.append(np.array([self.reference[reactant] for reactant in reactants]))
             self.reaction_products.append(np.array([self.reference[product] for product in products]))
         self.reaction_rate = np.array(self.reaction_rate)
 
-    def predict_concentration_slice(self, initial_concentration: np.ndarray, time_slice: np.ndarray, mass_balance):
+    def predict_concentration_slice(self, initial_concentration: np.ndarray, time_slice: np.ndarray, mass_balance: list[str]):
         # allows the format last slice function to perform formatting based on the last used time_slice
         self.time = time_slice
 
@@ -142,28 +140,9 @@ class DRL:
         )
         return result_pre_addition, results_post_addition
 
-    def format_last_slice(self, experimental: pd.DataFrame, prediction: pd.DataFrame):
-        """
-        format the last slice of the predicted and experimental data such that they both start at t=0,
-        and have the same size
-        """
-        if self.time is None:
-            raise ValueError("No time parameter has been defined.")
-
-        # prepare the size of each dataset
-        _experimental = experimental.copy()
-        _experimental = _experimental[_experimental["time (min)"].between(self.time[0], self.time[-1])].reset_index(
-            drop=True)
-        _experimental["time (min)"] = _experimental["time (min)"] - _experimental["time (min)"][0]
-
-        _prediction = prediction.copy()
-        _prediction["time (min)"] = _prediction["time (min)"] - _prediction["time (min)"][0]
-
-        return _experimental, _prediction
-
 
 def main():
-    """Compare the results found using the DRL class with the original excel sheet from Roelant et al."""
+    """Compare the results found using the DRL class with the original Excel sheet from Roelant et al."""
 
     REACTIONS_ONEWAY = [
         # unlabeled
@@ -268,7 +247,7 @@ def main():
     t = default_timer()
     for i in range(1):
         drl = DRL(reactions=reaction_equations,
-                  rates=rate_constants)
+                  rate_constants=rate_constants)
         _prediction_unlabeled, _prediction_labeled = drl.predict_concentration(experimental_conditions)
     print(f"this took {default_timer()-t:.2f} seconds")
 
