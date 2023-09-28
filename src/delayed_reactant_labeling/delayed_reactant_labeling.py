@@ -7,7 +7,6 @@ from typing import Optional
 from numba import njit
 from numba.typed import List
 from copy import deepcopy
-import warnings
 
 
 @dataclass

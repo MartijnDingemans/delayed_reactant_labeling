@@ -194,7 +194,7 @@ class RateConstantOptimizerTemplate(ABC):
             """update the progress bar"""
             pbar.update(1)
 
-        with tqdm(total=maxiter) as pbar:
+        with tqdm(total=maxiter, miniters=25) as pbar:
             # the minimization process is stored within the log, containing all x's and errors.
             minimize(fun=optimization_step,
                      x0=x0,

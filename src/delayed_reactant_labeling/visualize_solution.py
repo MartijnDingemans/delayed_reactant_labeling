@@ -213,37 +213,6 @@ class VisualizeSolution:
         fig.savefig(f"{self.path}bar_plot_of_all_errors.svg", dpi=1000)
         return fig, ax
 
-    def show_error_contributions_detailed(self) -> ((plt.Figure, plt.Axes), (plt.Figure, plt.Axes), (plt.Figure, plt.Axes)):
-        raise NotImplementedError
-        prediction = self.best_prediction
-        _experimental = self.experimental
-
-        all_errors, (fig_iso, axs_iso), (fig_lab, axs_lab), (fig_TIC, axs_TIC) = self.calculate_individual_error(
-            _experimental,
-            prediction,
-            True)
-
-        for ax in axs_iso:
-            ax.legend()
-        fig_iso.suptitle(self.description)
-        fig_iso.show()
-        fig_iso.savefig(f"{self.path}fit_between_isomers.png", dpi=1000)
-        fig_iso.savefig(f"{self.path}fit_between_isomers.svg", dpi=1000)
-
-        for ax in axs_lab:
-            ax.legend()
-        fig_lab.suptitle(self.description)
-        fig_lab.show()
-        fig_lab.savefig(f"{self.path}fit_with_labeled.png", dpi=1000)
-        fig_lab.savefig(f"{self.path}fit_with_labeled.svg", dpi=1000)
-
-        fig_TIC.suptitle(self.description)
-        fig_TIC.show()
-        fig_TIC.savefig(f"{self.path}fit_with_TIC.png", dpi=1000)
-        fig_TIC.savefig(f"{self.path}fit_with_TIC.svg", dpi=1000)
-
-        return (fig_iso, axs_iso,), (fig_lab, axs_lab,), (fig_TIC, axs_TIC,)
-
     def show_enantiomer_ratio(self, intermediates: list[str], experimental: pd.DataFrame) -> tuple[plt.Figure, plt.Axes]:
         fig, ax = plt.subplots()
         ax.set_title(self.description)
@@ -343,21 +312,23 @@ class VisualizeSolution:
         clip.write_videofile(f"{self.path}visualized_rate_over_time.mp4")
 
     def show_rate_sensitivity(self,
-                              k_multiplier=np.linspace(0.5, 1.5, 11),
-                              threshold=5) -> (plt.Figure, plt.Axes):
+                              lower_power: int = -6,
+                              upper_power: int = 2,
+                              steps: int = 101,
+                              threshold=3) -> (plt.Figure, plt.Axes):
         from mpl_toolkits.axes_grid1 import make_axes_locatable
+        import matplotlib.ticker as ticker
 
-        ticks = self.progress.best_X.copy()  # when a rate is zero, remove it
-        errors = np.full((len(k_multiplier), len(self.progress.best_X)), np.nan)
+        x_value = np.logspace(lower_power, upper_power, steps)
 
-        for col, (key, x) in enumerate(tqdm(self.progress.best_X.items())):
-            if x == 0:
-                del ticks[key]
-                continue
+        ticks = self.progress.best_X[~self.index_constant_values]
+        errors = np.full((len(x_value), len(ticks)), np.nan)
 
-            adjusted_xs = k_multiplier * x
-            for row, adjusted_x in enumerate(adjusted_xs):
-                best_X = self.progress.best_X.copy()
+        # loop over all non-constant values and adjust those
+        for col, key in enumerate(tqdm(self.progress.best_X[~self.index_constant_values].keys())):
+            for row, adjusted_x in enumerate(x_value):
+                # insert all values into the plot
+                best_X = self.progress.best_X
                 best_X[key] = adjusted_x
 
                 prediction = self.rate_constant_optimizer.create_prediction(
@@ -370,15 +341,18 @@ class VisualizeSolution:
 
         fig, ax = plt.subplots()
         errors[errors > threshold * errors.min()] = threshold * errors.min()
-        im = ax.imshow(errors, origin="lower")
+        im = ax.imshow(errors, origin="lower", aspect="auto")
 
         ax.set_xticks(np.arange(len(ticks)), ticks.index, fontsize="small")
         ax.tick_params(axis='x', rotation=45)
 
-        ind = np.linspace(0, len(k_multiplier) - 1, 5).round(0).astype(int)
-        ax.set_yticks(ind, k_multiplier[ind].round(2))
+        n_orders_of_magnitude = int(upper_power - lower_power + 1)
+        ind = np.linspace(0, len(x_value) - 1, n_orders_of_magnitude)  # .round(0).astype(int)
+        yticks = [f"{y:.0e}" for y in np.logspace(lower_power, upper_power, n_orders_of_magnitude)]
+        ax.set_yticks(ind, yticks)
 
-        ax.set_ylabel("multiplier of k")
+        ax.set_ylabel("adjusted value")
+        # ax.set_yscale("log")
 
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", "5%", pad="3%")
