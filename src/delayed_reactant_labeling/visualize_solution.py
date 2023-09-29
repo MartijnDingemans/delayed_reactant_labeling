@@ -317,7 +317,6 @@ class VisualizeSolution:
                               steps: int = 101,
                               threshold=3) -> (plt.Figure, plt.Axes):
         from mpl_toolkits.axes_grid1 import make_axes_locatable
-        import matplotlib.ticker as ticker
 
         x_value = np.logspace(lower_power, upper_power, steps)
 
@@ -334,8 +333,7 @@ class VisualizeSolution:
                 prediction = self.rate_constant_optimizer.create_prediction(
                     x=best_X.to_numpy(), x_description=self.progress.x_description)[0]
                 found_error = self.rate_constant_optimizer.calculate_error_functions(prediction)
-                errors[row, col] = self.rate_constant_optimizer.weigh_errors(found_error).sum()
-                # self.calculate_total_error(rates)[0]
+                errors[row, col] = self.rate_constant_optimizer.calculate_total_error(found_error)
 
         errors = errors[:, ~np.isnan(errors[0, :])]
 
@@ -350,9 +348,7 @@ class VisualizeSolution:
         ind = np.linspace(0, len(x_value) - 1, n_orders_of_magnitude)  # .round(0).astype(int)
         yticks = [f"{y:.0e}" for y in np.logspace(lower_power, upper_power, n_orders_of_magnitude)]
         ax.set_yticks(ind, yticks)
-
         ax.set_ylabel("adjusted value")
-        # ax.set_yscale("log")
 
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", "5%", pad="3%")

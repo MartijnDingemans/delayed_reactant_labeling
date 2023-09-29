@@ -64,13 +64,6 @@ class OptimizerProgress:
         self.best_error: float = self.all_errors[best_iteration_index]
         self.best_ratio: float = self.all_errors[best_iteration_index]
 
-        # simplex = []
-        # df_last_n = df.iloc[-last_n:, :]
-        # for row in df_last_n.loc[df_last_n["error"].sort_values()[:len(rate_constants_names) + 1].index, "x"]:
-        #     simplex.append(np.array(row))
-        # self.simplex = np.array(simplex)
-        # best_iteration = df_last_n.iloc[df_last_n['error'].argmin(), :]
-
     @property
     def best_X(self):
         return self._best_X.copy()
@@ -135,6 +128,14 @@ class RateConstantOptimizerTemplate(ABC):
 
         return errors * self.weights
 
+    def calculate_total_error(self, errors):
+        """
+        weighs and sums the errors.
+        :param errors: unweighted errors
+        :return: weighed total error
+        """
+        return self.weigh_errors(errors).sum(skipna=False)
+
     def optimize(self,
                  x0: np.ndarray,
                  x_description: list[str],
@@ -184,8 +185,7 @@ class RateConstantOptimizerTemplate(ABC):
 
             prediction, predicted_compound_ratio = self.create_prediction(x, x_description)
             errors = self.calculate_error_functions(prediction)
-            weighed_errors = self.weigh_errors(errors)
-            total_error = weighed_errors.sum()
+            total_error = self.calculate_total_error(errors)
 
             logger.log(pd.Series([x, total_error, predicted_compound_ratio], index=["x", "error", "ratio"]))
             return total_error
