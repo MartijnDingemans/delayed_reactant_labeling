@@ -335,10 +335,9 @@ class VisualizeSolution:
                 found_error = self.rate_constant_optimizer.calculate_error_functions(prediction)
                 errors[row, col] = self.rate_constant_optimizer.calculate_total_error(found_error)
 
-        errors = errors[:, ~np.isnan(errors[0, :])]
+        errors[errors > threshold * errors.min()] = threshold * errors.min()
 
         fig, ax = plt.subplots()
-        errors[errors > threshold * errors.min()] = threshold * errors.min()
         im = ax.imshow(errors, origin="lower", aspect="auto")
 
         ax.set_xticks(np.arange(len(ticks)), ticks.index, fontsize="small")
