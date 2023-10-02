@@ -65,9 +65,6 @@ class DRL:
         self.reaction_rate = np.array(self.reaction_rate)
 
     def predict_concentration_slice(self, initial_concentration: np.ndarray, time_slice: np.ndarray, mass_balance: list[str]):
-        # allows the format last slice function to perform formatting based on the last used time_slice
-        self.time = time_slice
-
         prev_prediction = initial_concentration
         predicted_concentration = np.full((len(time_slice), len(initial_concentration)), np.nan)
         predicted_concentration[0, :] = initial_concentration
