@@ -20,6 +20,12 @@ class Experimental_Conditions:
     def copy(self):
         return deepcopy(self)
 
+    def __post_init__(self):
+        """Check the elements of the time array, to prevent pd.Series objects being passed through."""
+        for time_slice in self.time:
+            if not isinstance(time_slice, np.ndarray):
+                raise ValueError(f"Time slices must be np.ndarray but instead a {type(time_slice)} was found.")
+
 
 @njit
 def calculate_step(reaction_rate, reaction_reactants, reaction_products, delta_time, concentrations: np.ndarray):
