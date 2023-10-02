@@ -62,7 +62,7 @@ class OptimizerProgress:
 
         self._best_X: pd.Series = pd.Series(self.all_X.loc[best_iteration_index, :], index=self.x_description)
         self.best_error: float = self.all_errors[best_iteration_index]
-        self.best_ratio: float = self.all_errors[best_iteration_index]
+        self.best_ratio: float = self.all_ratios[best_iteration_index]
 
     @property
     def best_X(self):
@@ -117,6 +117,7 @@ class RateConstantOptimizerTemplate(ABC):
         :param errors: unweighted errors
         :return: weighed errors
         """
+        assert isinstance(errors, pd.Series)
         if self.weights is None:
             weights = np.ones(errors.shape)
             for description, weight in self.raw_weights:
@@ -128,7 +129,7 @@ class RateConstantOptimizerTemplate(ABC):
 
         return errors * self.weights
 
-    def calculate_total_error(self, errors):
+    def calculate_total_error(self, errors: pd.Series):
         """
         weighs and sums the errors.
         :param errors: unweighted errors
