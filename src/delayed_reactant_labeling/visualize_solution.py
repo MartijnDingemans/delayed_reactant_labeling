@@ -52,7 +52,6 @@ class VisualizeSolution:
         ax.set_xlabel("iteration")
         ax.set_ylabel("sum of MAE", color="C0")
         ax.set_title(f"{self.description}")
-        fig.show()
         fig.savefig(f"{self.path}error_over_time.png", dpi=1000)
         fig.savefig(f"{self.path}error_over_time.svg", dpi=1000)
         return fig, ax
@@ -105,7 +104,6 @@ class VisualizeSolution:
         fig.suptitle(f"{self.description}")
         fig.supylabel("rate constant intensity")
         fig.tight_layout()
-        fig.show()
         fig.savefig(f"{self.path}comparison_with_literature.png", dpi=1000)
         fig.savefig(f"{self.path}comparison_with_literature.svg", dpi=1000)
         return fig, axs
@@ -195,7 +193,6 @@ class VisualizeSolution:
             create_3d_video_animation()
 
         fig.suptitle(f"{self.description}")
-        fig.show()
         fig.savefig(f"{self.path}path_in_pca_space.png", dpi=1000)
         fig.savefig(f"{self.path}path_in_pca_space.svg", dpi=1000)
         return fig, [ax, ax_pc0, ax_pc1]
@@ -208,7 +205,6 @@ class VisualizeSolution:
         ax.set_ylabel("MAE")
         ax.set_xlabel("rate constant")
         fig.tight_layout()
-        fig.show()
         fig.savefig(f"{self.path}bar_plot_of_all_errors.png", dpi=1000)
         fig.savefig(f"{self.path}bar_plot_of_all_errors.svg", dpi=1000)
         return fig, ax
@@ -252,7 +248,6 @@ class VisualizeSolution:
         xl, xu = ax.get_xlim()
         ax.set_xlim(xl, xu + 0.2)
         fig.tight_layout()
-        fig.show()
         fig.savefig(f"{self.path}enantiomer_ratio.png", dpi=1000)
         fig.savefig(f"{self.path}enantiomer_ratio.svg", dpi=1000)
         return fig, ax
@@ -354,7 +349,6 @@ class VisualizeSolution:
         fig.colorbar(im, cax=cax, label="MAE")
         ax.set_title(f"{self.description}")
         fig.tight_layout()
-        fig.show()
         fig.savefig(f"{self.path}sensitivity_of_rate.png", dpi=1000)
         fig.savefig(f"{self.path}sensitivity_of_rate.svg", dpi=1000)
 
