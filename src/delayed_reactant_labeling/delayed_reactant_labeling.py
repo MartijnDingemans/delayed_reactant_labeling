@@ -29,7 +29,9 @@ class Experimental_Conditions:
 @njit
 def calculate_step(reaction_rate: np.ndarray,
                    reaction_reactants: List[np.ndarray],
-                   reaction_products: List[np.ndarray], delta_time: float, concentrations: np.ndarray):
+                   reaction_products: List[np.ndarray],
+                   delta_time: float,
+                   concentrations: np.ndarray):
     """
     Calculates a singular step using the Explicit Euler formula.
     Foreach defined reaction all reactants will be decreased by the 'created amount',
@@ -42,16 +44,46 @@ def calculate_step(reaction_rate: np.ndarray,
     :return: The predicted concentrations.
     """
     new_concentration = concentrations.copy()
-    for i in range(reaction_rate.shape[0]):
-        created_amount = delta_time * reaction_rate[i] * np.prod(concentrations[reaction_reactants[i]])
-        new_concentration[reaction_reactants[i]] -= created_amount  # consumed
-        new_concentration[reaction_products[i]] += created_amount  # produced
+    for reaction_i in range(reaction_rate.shape[0]):
+        created_amount = delta_time * reaction_rate[reaction_i] * np.prod(
+            concentrations[reaction_reactants[reaction_i]])
+        new_concentration[reaction_reactants[reaction_i]] -= created_amount  # consumed
+        new_concentration[reaction_products[reaction_i]] += created_amount  # produced
     return new_concentration
+
+
+@njit
+def calculate_steps(reaction_rate: np.ndarray,
+                    reaction_reactants: List[np.ndarray],
+                    reaction_products: List[np.ndarray],
+                    concentration: np.ndarray,
+                    time_slice: np.ndarray, steps_per_step):
+    # assert steps per step >= 1
+
+    prediction = np.full((time_slice.shape[0], concentration.shape[0]), np.nan)  # TODO np.empty for efficiency
+    prediction[0, :] = concentration  # should start with the initial concentrations
+
+    # for each time step in the time slice
+    for time_i in range(time_slice.shape[0] - 1):
+        # Step over the total delta t in n steps per step. Discard the intermediate results.
+        dt = (time_slice[time_i + 1] - time_slice[time_i]) / steps_per_step
+        for _ in range(steps_per_step):
+            concentration = calculate_step(
+                reaction_rate=reaction_rate,
+                reaction_reactants=reaction_reactants,
+                reaction_products=reaction_products,
+                concentrations=concentration,
+                delta_time=dt)
+
+        prediction[time_i+1, :] = concentration
+        # go for an additional few steps
+    return prediction
 
 
 class DRL:
     """Class which enables efficient prediction of changes in concentration in a chemical system.
     Especially useful for Delayed Reactant Labeling (DRL) experiments."""
+
     def __init__(self,
                  reactions: list[tuple[str, list[str], list[str]]],
                  rate_constants: dict[str: float]):
@@ -102,32 +134,37 @@ class DRL:
         Higher values yield higher accuracy at the cost of computation time.
         :return prediction: pd.Dataframe of the prediction and a np.ndarray of the last prediction step.
         """
-        predicted_concentration = np.full((len(time_slice), len(initial_concentration)), np.nan)
-        predicted_concentration[0, :] = initial_concentration
-        prev_t = time_slice[0]
-
+        # predicted_concentration = np.full((len(time_slice), len(initial_concentration)), np.nan)
+        # predicted_concentration[0, :] = initial_concentration
+        # prev_t = time_slice[0]
         # use the given steps
-        prediction_step = initial_concentration
-        for row, next_spectra_t in enumerate(time_slice[1:]):
-            in_between_steps = np.linspace(prev_t, next_spectra_t, steps_per_step + 1)[1:]  # ignore start
-            for new_t in in_between_steps:
-                prediction_step = calculate_step(
-                    reaction_rate=self.reaction_rate,
-                    reaction_reactants=self.reaction_reactants,
-                    reaction_products=self.reaction_products,
-                    concentrations=prediction_step,
-                    delta_time=new_t - prev_t, )
-                prev_t = new_t
-
-            if any(prediction_step < 0):
-                raise ValueError("Negative concentrations were found, increase the steps per step to resolve this. "
-                                 f"\n\tThis happened during iteration {row}")
-            predicted_concentration[row + 1, :] = prediction_step
+        # prediction_step = initial_concentration
+        # for row, next_spectra_t in enumerate(time_slice[1:]):
+        #     in_between_steps = np.linspace(prev_t, next_spectra_t, steps_per_step + 1)[1:]  # ignore start
+        #     for new_t in in_between_steps:
+        #         prediction_step = calculate_step(
+        #             reaction_rate=self.reaction_rate,
+        #             reaction_reactants=self.reaction_reactants,
+        #             reaction_products=self.reaction_products,
+        #             concentrations=prediction_step,
+        #             delta_time=new_t - prev_t, )
+        #         prev_t = new_t
+        #     if any(prediction_step < 0):
+        #         raise ValueError("Negative concentrations were found, increase the steps per step to resolve this. "
+        #                          f"\n\tThis happened during iteration {row}")
+        #     predicted_concentration[row + 1, :] = prediction_step
+        predicted_concentration = calculate_steps(
+            reaction_rate=self.reaction_rate,
+            reaction_reactants=self.reaction_reactants,
+            reaction_products=self.reaction_products,
+            concentration=initial_concentration,
+            time_slice=time_slice,
+            steps_per_step=steps_per_step)
 
         df_result = pd.DataFrame(predicted_concentration, columns=list(self.reference.keys()))
         df_result["time"] = time_slice
 
-        return df_result, prediction_step  # last prediction step
+        return df_result, predicted_concentration[-1, :]  # last prediction step
 
     def predict_concentration(self,
                               experimental_conditions: Experimental_Conditions,
@@ -151,6 +188,9 @@ class DRL:
             time_slice=experimental_conditions.time[0],
             steps_per_step=steps_per_step
         )
+
+        # TODO pre addition situation should also predict upto the first point the post situation,
+        #  to ensure full coverage
 
         # dillution step
         diluted_concentrations = last_prediction * experimental_conditions.dilution_factor
