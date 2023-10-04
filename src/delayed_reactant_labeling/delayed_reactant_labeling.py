@@ -27,11 +27,11 @@ class Experimental_Conditions:
 
 
 @njit
-def calculate_step(reaction_rate: np.ndarray,
-                   reaction_reactants: List[np.ndarray],
-                   reaction_products: List[np.ndarray],
-                   delta_time: float,
-                   concentrations: np.ndarray):
+def _calculate_step(reaction_rate: np.ndarray,
+                    reaction_reactants: List[np.ndarray],
+                    reaction_products: List[np.ndarray],
+                    delta_time: float,
+                    concentrations: np.ndarray):
     """
     Calculates a singular step using the Explicit Euler formula.
     Foreach defined reaction all reactants will be decreased by the 'created amount',
@@ -53,14 +53,14 @@ def calculate_step(reaction_rate: np.ndarray,
 
 
 @njit
-def calculate_steps(reaction_rate: np.ndarray,
-                    reaction_reactants: List[np.ndarray],
-                    reaction_products: List[np.ndarray],
-                    concentration: np.ndarray,
-                    time_slice: np.ndarray, steps_per_step):
+def _calculate_steps(reaction_rate: np.ndarray,
+                     reaction_reactants: List[np.ndarray],
+                     reaction_products: List[np.ndarray],
+                     concentration: np.ndarray,
+                     time_slice: np.ndarray, steps_per_step):
     # assert steps per step >= 1
 
-    prediction = np.full((time_slice.shape[0], concentration.shape[0]), np.nan)  # TODO np.empty for efficiency
+    prediction = np.empty((time_slice.shape[0], concentration.shape[0]))
     prediction[0, :] = concentration  # should start with the initial concentrations
 
     # for each time step in the time slice
@@ -68,15 +68,14 @@ def calculate_steps(reaction_rate: np.ndarray,
         # Step over the total delta t in n steps per step. Discard the intermediate results.
         dt = (time_slice[time_i + 1] - time_slice[time_i]) / steps_per_step
         for _ in range(steps_per_step):
-            concentration = calculate_step(
+            concentration = _calculate_step(
                 reaction_rate=reaction_rate,
                 reaction_reactants=reaction_reactants,
                 reaction_products=reaction_products,
                 concentrations=concentration,
-                delta_time=dt)
-
+                delta_time=dt
+            )
         prediction[time_i+1, :] = concentration
-        # go for an additional few steps
     return prediction
 
 
@@ -101,9 +100,6 @@ class DRL:
                 self.reference.add(compound)
         self.reference = {compound: n for n, compound in enumerate(sorted(self.reference))}
         self.initial_concentrations = np.zeros((len(self.reference)))
-
-        # store the last used time slice
-        self.time = None
 
         # construct a list containing the indices of all the reactants and products per reaction
         self.reaction_rate = []  # np array at the end
@@ -134,26 +130,8 @@ class DRL:
         Higher values yield higher accuracy at the cost of computation time.
         :return prediction: pd.Dataframe of the prediction and a np.ndarray of the last prediction step.
         """
-        # predicted_concentration = np.full((len(time_slice), len(initial_concentration)), np.nan)
-        # predicted_concentration[0, :] = initial_concentration
-        # prev_t = time_slice[0]
-        # use the given steps
-        # prediction_step = initial_concentration
-        # for row, next_spectra_t in enumerate(time_slice[1:]):
-        #     in_between_steps = np.linspace(prev_t, next_spectra_t, steps_per_step + 1)[1:]  # ignore start
-        #     for new_t in in_between_steps:
-        #         prediction_step = calculate_step(
-        #             reaction_rate=self.reaction_rate,
-        #             reaction_reactants=self.reaction_reactants,
-        #             reaction_products=self.reaction_products,
-        #             concentrations=prediction_step,
-        #             delta_time=new_t - prev_t, )
-        #         prev_t = new_t
-        #     if any(prediction_step < 0):
-        #         raise ValueError("Negative concentrations were found, increase the steps per step to resolve this. "
-        #                          f"\n\tThis happened during iteration {row}")
-        #     predicted_concentration[row + 1, :] = prediction_step
-        predicted_concentration = calculate_steps(
+        # calculate all steps of the time slice
+        predicted_concentration = _calculate_steps(
             reaction_rate=self.reaction_rate,
             reaction_reactants=self.reaction_reactants,
             reaction_products=self.reaction_products,
@@ -161,6 +139,11 @@ class DRL:
             time_slice=time_slice,
             steps_per_step=steps_per_step)
 
+        if np.min(predicted_concentration) < 0:
+            raise ValueError("Negative concentration was detected, perhaps this was caused by in to large dt. "
+                             "Consider increasing the steps per step.")
+
+        # do some formatting
         df_result = pd.DataFrame(predicted_concentration, columns=list(self.reference.keys()))
         df_result["time"] = time_slice
 
