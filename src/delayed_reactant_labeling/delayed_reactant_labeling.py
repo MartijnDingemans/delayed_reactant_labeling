@@ -16,9 +16,6 @@ class Experimental_Conditions:
     labeled_reactant: dict[str, float]
     mass_balance: Optional[list[str]] = None
 
-    def copy(self):
-        return deepcopy(self)
-
     def __post_init__(self):
         """Check the elements of the time array, to prevent pd.Series objects being passed through."""
         for time_slice in self.time:
@@ -140,8 +137,8 @@ class DRL:
             steps_per_step=steps_per_step)
 
         if np.min(predicted_concentration) < 0:
-            raise ValueError("Negative concentration was detected, perhaps this was caused by in to large dt. "
-                             "Consider increasing the steps per step.")
+            raise ValueError("Negative concentrations were detected, perhaps this was caused by a large dt. "
+                             "Consider increasing the steps_per_step.")
 
         # do some formatting
         df_result = pd.DataFrame(predicted_concentration, columns=list(self.reference.keys()))
@@ -171,9 +168,6 @@ class DRL:
             time_slice=experimental_conditions.time[0],
             steps_per_step=steps_per_step
         )
-
-        # TODO pre addition situation should also predict upto the first point the post situation,
-        #  to ensure full coverage
 
         # dillution step
         diluted_concentrations = last_prediction * experimental_conditions.dilution_factor
