@@ -6,6 +6,11 @@ from numba import njit
 from numba.typed import List
 
 
+class InvalidPredictionError(Exception):
+    """Exception which is raised upon the detection of invalid predictions."""
+    pass
+
+
 @dataclass
 class Experimental_Conditions:
     """Class which stores the basic information which is required to simulate a reaction."""
@@ -71,7 +76,7 @@ def _calculate_steps(reaction_rate: np.ndarray,
                 concentrations=concentration,
                 delta_time=dt
             )
-        prediction[time_i+1, :] = concentration
+        prediction[time_i + 1, :] = concentration
     return prediction
 
 
@@ -136,8 +141,9 @@ class DRL:
             steps_per_step=steps_per_step)
 
         if np.min(predicted_concentration) < 0:
-            raise ValueError("Negative concentrations were detected, perhaps this was caused by a large dt. "
-                             "Consider increasing the steps_per_step.")
+            raise InvalidPredictionError(
+                "Negative concentrations were detected, perhaps this was caused by a large dt. "
+                "Consider increasing the steps_per_step.")
 
         # do some formatting
         df_result = pd.DataFrame(predicted_concentration, columns=list(self.reference.keys()))

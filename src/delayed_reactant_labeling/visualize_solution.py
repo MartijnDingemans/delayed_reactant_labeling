@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
 from tqdm import tqdm
+from delayed_reactant_labeling.delayed_reactant_labeling import InvalidPredictionError
 from delayed_reactant_labeling.optimize_rate_constants import RateConstantOptimizerTemplate
 
 
@@ -321,14 +322,18 @@ class VisualizeSolution:
                 best_X = self.progress.best_X
                 best_X[key] = adjusted_x
 
-                # TODO try except NegativeConcentrationError
+                try:
+                    prediction = self.rate_constant_optimizer.create_prediction(
+                        x=best_X.to_numpy(), x_description=self.progress.x_description)[0]
+                    found_error = self.rate_constant_optimizer.calculate_error_functions(prediction)
+                except InvalidPredictionError as e:
+                    print('InvalidPredictionError: ', e)
+                    found_error = np.nan
 
-                prediction = self.rate_constant_optimizer.create_prediction(
-                    x=best_X.to_numpy(), x_description=self.progress.x_description)[0]
-                found_error = self.rate_constant_optimizer.calculate_error_functions(prediction)
                 errors[row, col] = self.rate_constant_optimizer.calculate_total_error(found_error)
 
-        errors[errors > threshold * errors.min()] = threshold * errors.min()
+        min_error = np.nanmin(errors)
+        errors[errors > threshold * min_error] = threshold * min_error
 
         fig, ax = plt.subplots()
         im = ax.imshow(errors, origin="lower", aspect="auto")
