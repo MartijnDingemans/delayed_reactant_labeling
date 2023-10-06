@@ -15,6 +15,7 @@ class VisualizeSolution:
                  rate_constant_optimizer: RateConstantOptimizerTemplate,
                  index_constant_values: Optional[np.ndarray],
                  isomers: Optional[list[str]] = None,
+                 dpi: int = 600,
                  ):
         self.path = path
         self.description = description
@@ -23,12 +24,7 @@ class VisualizeSolution:
         self.progress = self.rate_constant_optimizer.load_optimization_progress(path)
         self.isomers = isomers
         self.index_constant_values = index_constant_values
-
-        # self.create_prediction = create_prediction
-        # self.calculate_individual_error = calculate_individual_error
-        # self.calculate_total_error = calculate_total_error
-        # self.experimental = experimental
-        # self.experimental_conditions = experimental_conditions
+        self.dpi = dpi
 
     @property
     def best_prediction(self):
@@ -52,8 +48,8 @@ class VisualizeSolution:
         ax.set_xlabel("iteration")
         ax.set_ylabel("sum of MAE", color="C0")
         ax.set_title(f"{self.description}")
-        fig.savefig(f"{self.path}error_over_time.png", dpi=1000)
-        fig.savefig(f"{self.path}error_over_time.svg", dpi=1000)
+        fig.savefig(f"{self.path}error_over_time.png", dpi=self.dpi)
+        fig.savefig(f"{self.path}error_over_time.svg", dpi=self.dpi)
         return fig, ax
 
     def show_comparison_with_literature(self,
@@ -104,8 +100,8 @@ class VisualizeSolution:
         fig.suptitle(f"{self.description}")
         fig.supylabel("rate constant intensity")
         fig.tight_layout()
-        fig.savefig(f"{self.path}comparison_with_literature.png", dpi=1000)
-        fig.savefig(f"{self.path}comparison_with_literature.svg", dpi=1000)
+        fig.savefig(f"{self.path}comparison_with_literature.png", dpi=self.dpi)
+        fig.savefig(f"{self.path}comparison_with_literature.svg", dpi=self.dpi)
         return fig, axs
 
     def show_optimization_path_in_pca(self, create_3d_video: bool = False, fps: int = 30) -> tuple[
@@ -193,8 +189,8 @@ class VisualizeSolution:
             create_3d_video_animation()
 
         fig.suptitle(f"{self.description}")
-        fig.savefig(f"{self.path}path_in_pca_space.png", dpi=1000)
-        fig.savefig(f"{self.path}path_in_pca_space.svg", dpi=1000)
+        fig.savefig(f"{self.path}path_in_pca_space.png", dpi=self.dpi)
+        fig.savefig(f"{self.path}path_in_pca_space.svg", dpi=self.dpi)
         return fig, [ax, ax_pc0, ax_pc1]
 
     def show_error_contributions(self) -> tuple[plt.Figure, plt.Axes]:
@@ -205,8 +201,8 @@ class VisualizeSolution:
         ax.set_ylabel("MAE")
         ax.set_xlabel("rate constant")
         fig.tight_layout()
-        fig.savefig(f"{self.path}bar_plot_of_all_errors.png", dpi=1000)
-        fig.savefig(f"{self.path}bar_plot_of_all_errors.svg", dpi=1000)
+        fig.savefig(f"{self.path}bar_plot_of_all_errors.png", dpi=self.dpi)
+        fig.savefig(f"{self.path}bar_plot_of_all_errors.svg", dpi=self.dpi)
         return fig, ax
 
     def show_enantiomer_ratio(self, intermediates: list[str], experimental: pd.DataFrame) -> tuple[plt.Figure, plt.Axes]:
@@ -248,8 +244,8 @@ class VisualizeSolution:
         xl, xu = ax.get_xlim()
         ax.set_xlim(xl, xu + 0.2)
         fig.tight_layout()
-        fig.savefig(f"{self.path}enantiomer_ratio.png", dpi=1000)
-        fig.savefig(f"{self.path}enantiomer_ratio.svg", dpi=1000)
+        fig.savefig(f"{self.path}enantiomer_ratio.png", dpi=self.dpi)
+        fig.savefig(f"{self.path}enantiomer_ratio.svg", dpi=self.dpi)
         return fig, ax
 
     def animate_rate_over_time(
@@ -325,6 +321,8 @@ class VisualizeSolution:
                 best_X = self.progress.best_X
                 best_X[key] = adjusted_x
 
+                # TODO try except NegativeConcentrationError
+
                 prediction = self.rate_constant_optimizer.create_prediction(
                     x=best_X.to_numpy(), x_description=self.progress.x_description)[0]
                 found_error = self.rate_constant_optimizer.calculate_error_functions(prediction)
@@ -349,7 +347,7 @@ class VisualizeSolution:
         fig.colorbar(im, cax=cax, label="MAE")
         ax.set_title(f"{self.description}")
         fig.tight_layout()
-        fig.savefig(f"{self.path}sensitivity_of_rate.png", dpi=1000)
-        fig.savefig(f"{self.path}sensitivity_of_rate.svg", dpi=1000)
+        fig.savefig(f"{self.path}sensitivity_of_rate.png", dpi=self.dpi)
+        fig.savefig(f"{self.path}sensitivity_of_rate.svg", dpi=self.dpi)
 
         return fig, ax
