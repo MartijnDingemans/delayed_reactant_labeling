@@ -86,14 +86,24 @@ class DRL:
 
     def __init__(self,
                  reactions: list[tuple[str, list[str], list[str]]],
-                 rate_constants: dict[str: float]):
+                 rate_constants: dict[str: float],
+                 verbose=False):
         """Initialize the chemical system.
         :param reactions: List of reactions, each reaction is given as a tuple.
         Its first element is a string, which determines which rate constant is applicable to that reaction.
         Its second element is a list containing the identifiers (strings) of each reactant in the reaction.
         The third element contains a list for the reaction products
         :param rate_constants: A dictionairy or which maps the rate constants to their respective values.
+        :param verbose: If True, it will print and store information on which reactions are intialized.
         """
+        if verbose:
+            df = []
+            for k, reactants, products in reactions:
+                df.append(pd.Series([k, rate_constants[k], reactants, products],
+                                    index=['k', 'k-value', 'reactants', 'products']))
+            self.reactions = pd.DataFrame(df)
+            print(self.reactions)
+
         # link the name of a chemical with an index
         self.reference = set()
         for k, reactants, products in reactions:
