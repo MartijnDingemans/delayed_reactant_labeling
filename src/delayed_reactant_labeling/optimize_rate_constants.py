@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, Callable
 
 from scipy.optimize import minimize
+from sklearn.metrics import mean_absolute_error
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
@@ -86,9 +87,24 @@ class OptimizerProgress:
 
 
 class RateConstantOptimizerTemplate(ABC):
-    def __init__(self, raw_weights: list[tuple[str, float]]):
+    def __init__(self, raw_weights: dict[str, float], experimental: pd.DataFrame) -> None:
+        """
+        Initializes the Rate constant optimizer class.
+        :param raw_weights: dictionary containing str patterns as keys and the weight as values.
+        The str patterns will be searched for in the keys of the results from the 'calculate_curves' function.
+        The given weight will lower corresponding errors.
+        :param experimental: The experimental data
+        """
         self.raw_weights = raw_weights
         self.weights = None
+
+        # initialize all curves for the experimental (true) values.
+        self.experimental_curves = self.calculate_curves(experimental)
+
+        # check if any of the curves are potentially problematic
+        for curve_description, curve in self.experimental_curves.items():
+            if any(np.isnan(curve)):
+                raise ValueError(f"Experimental data curve for {curve_description} contains NaN values.")
 
     @abstractmethod
     def create_prediction(self, x: np.ndarray, x_description: list[str]) -> tuple[pd.DataFrame, float]:
@@ -97,19 +113,40 @@ class RateConstantOptimizerTemplate(ABC):
         :param x: Contains all parameters, which are to be optimized.
         Definitely includes are rate constants.
         :param x_description: Contains a description of each parameter.
-        :returns: Predicted values of the concentration for each chemical, as a function of time.
-                  Predicted ratio of compounds (enantiomeric ratio).
+        :return: Predicted values of the concentration for each chemical, as a function of time.
+                 Predicted ratio of compounds (enantiomeric ratio).
         """
         pass
 
+    @staticmethod
     @abstractmethod
-    def calculate_error_functions(self, pred: pd.DataFrame) -> pd.Series:
+    def calculate_curves(data: pd.DataFrame) -> dict[str, pd.Series]:
+        """
+        Calculate the curves corresponding to the data (either experimental or predicted).
+        The experimental curves will only be calculated once and are stored for subsequent use.
+        Internally, the experimental and predicted curves will be compared against each other to determine the error.
+        :param data: The data from which the curves should be calculated
+        :return: dict containing a description of each curve, and the corresponding curve.
+        """
+
+    def calculate_error_functions(self, prediction: pd.DataFrame, metric: Optional[Callable] = None) -> pd.Series:
         """
         Calculate the error caused by each error function.
-        :param pred: The predicted concentrations.
-        :return errors: The unweighted errors of each error function.
+        :param prediction: The predicted concentrations.
+        :param metric: The error metric which should be used, defaults to the mean absolute error.
+        :return: The unweighted errors of each error function.
         """
-        pass
+        if metric is None:
+            metric = mean_absolute_error
+
+        curves_predicted = self.calculate_curves(prediction)
+        error = {}
+        for curve_description, curve_prediction in curves_predicted.items():
+            error[curve_description] = metric(
+                y_true=self.experimental_curves[curve_description],
+                y_pred=curve_prediction)
+
+        return pd.Series(error)
 
     def weigh_errors(self, errors: pd.Series, ) -> pd.Series:
         """
@@ -120,7 +157,7 @@ class RateConstantOptimizerTemplate(ABC):
         assert isinstance(errors, pd.Series)
         if self.weights is None:
             weights = np.ones(errors.shape)
-            for description, weight in self.raw_weights:
+            for description, weight in self.raw_weights.items():
                 index = errors.index.str.contains(description)
                 if len(index) == 0:
                     raise ValueError(f"no matches were found for {description}")
@@ -129,7 +166,7 @@ class RateConstantOptimizerTemplate(ABC):
 
         return errors * self.weights
 
-    def calculate_total_error(self, errors: pd.Series):
+    def calculate_total_error(self, errors: pd.Series) -> float:
         """
         weighs and sums the errors.
         :param errors: unweighted errors
@@ -210,6 +247,6 @@ class RateConstantOptimizerTemplate(ABC):
         """
         Loads in the data from the log files.
         :param path: Folder in which the optimization_log.json and settings_info.json files can be found.
-        :return optimizer progress: OptimizerProgress instance which contains all information that was logged.
+        :return: OptimizerProgress instance which contains all information that was logged.
         """
         return OptimizerProgress(path)
