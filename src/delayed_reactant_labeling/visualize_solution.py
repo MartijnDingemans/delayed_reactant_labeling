@@ -28,7 +28,7 @@ class VisualizeSolution:
         self.dpi = dpi
 
     @property
-    def best_prediction(self):
+    def best_prediction(self) -> pd.DataFrame:
         if self._best_prediction is None:
             # recompute the best prediction so that we can make plots of it.
             # self.experimental, self._prediction = self.create_prediction(_rate_constants=self.progress.best_rates)
