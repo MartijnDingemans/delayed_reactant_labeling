@@ -87,7 +87,7 @@ class OptimizerProgress:
 
 
 class RateConstantOptimizerTemplate(ABC):
-    def __init__(self, raw_weights: dict[str, float], experimental: pd.DataFrame) -> None:
+    def __init__(self, raw_weights: dict[str, float], experimental: pd.DataFrame, metric: Optional[Callable[[np.ndarray, np.ndarray], float]]) -> None:
         """
         Initializes the Rate constant optimizer class.
         :param raw_weights: dictionary containing str patterns as keys and the weight as values.
@@ -100,6 +100,10 @@ class RateConstantOptimizerTemplate(ABC):
 
         # initialize all curves for the experimental (true) values.
         self.experimental_curves = self.calculate_curves(experimental)
+
+        if metric is None:
+            metric = mean_absolute_error
+        self.metric = metric
 
         # check if any of the curves are potentially problematic
         for curve_description, curve in self.experimental_curves.items():
@@ -129,20 +133,17 @@ class RateConstantOptimizerTemplate(ABC):
         :return: dict containing a description of each curve, and the corresponding curve.
         """
 
-    def calculate_error_functions(self, prediction: pd.DataFrame, metric: Optional[Callable] = None) -> pd.Series:
+    def calculate_error_functions(self, prediction: pd.DataFrame) -> pd.Series:
         """
         Calculate the error caused by each error function.
         :param prediction: The predicted concentrations.
         :param metric: The error metric which should be used, defaults to the mean absolute error.
         :return: The unweighted errors of each error function.
         """
-        if metric is None:
-            metric = mean_absolute_error
-
         curves_predicted = self.calculate_curves(prediction)
         error = {}
         for curve_description, curve_prediction in curves_predicted.items():
-            error[curve_description] = metric(
+            error[curve_description] = self.metric(
                 y_true=self.experimental_curves[curve_description],
                 y_pred=curve_prediction)
 
