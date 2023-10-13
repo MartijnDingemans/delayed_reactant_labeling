@@ -87,13 +87,17 @@ class OptimizerProgress:
 
 
 class RateConstantOptimizerTemplate(ABC):
-    def __init__(self, raw_weights: dict[str, float], experimental: pd.DataFrame, metric: Optional[Callable[[np.ndarray, np.ndarray], float]]) -> None:
+    def __init__(self,
+                 raw_weights: dict[str, float],
+                 experimental: pd.DataFrame,
+                 metric: Optional[Callable[[np.ndarray, np.ndarray], float]] = None) -> None:
         """
         Initializes the Rate constant optimizer class.
         :param raw_weights: dictionary containing str patterns as keys and the weight as values.
         The str patterns will be searched for in the keys of the results from the 'calculate_curves' function.
         The given weight will lower corresponding errors.
         :param experimental: The experimental data
+        :param metric: The error metric which should be used, defaults to the mean absolute error.
         """
         self.raw_weights = raw_weights
         self.weights = None
@@ -137,7 +141,6 @@ class RateConstantOptimizerTemplate(ABC):
         """
         Calculate the error caused by each error function.
         :param prediction: The predicted concentrations.
-        :param metric: The error metric which should be used, defaults to the mean absolute error.
         :return: The unweighted errors of each error function.
         """
         curves_predicted = self.calculate_curves(prediction)
