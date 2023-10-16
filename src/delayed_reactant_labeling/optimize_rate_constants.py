@@ -7,7 +7,10 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 from datetime import datetime
+
 import os
+import time
+from joblib import Parallel, delayed
 
 
 class JSON_log:
@@ -183,9 +186,11 @@ class RateConstantOptimizerTemplate(ABC):
                  x_description: list[str],
                  bounds: list[tuple[float, float]],
                  path: str,
-                 metadata: Optional[dict],
+                 metadata: Optional[dict] = None,
                  maxiter: float = 50000,
-                 resume_from_simplex=None
+                 resume_from_simplex=None,
+                 pbar_show=True,
+                 **tqdm_kwargs
                  ) -> None:
         """
         Optimizes the system, utilizing a nelder-mead algorithm.
@@ -196,6 +201,8 @@ class RateConstantOptimizerTemplate(ABC):
         :param metadata: The metadata that should be saved alongside the solution.
         :param maxiter: The maximum number of iterations.
         :param resume_from_simplex: When a simplex is given, the solution starts here.
+        :param pbar_show: If True, shows a progress bar.
+        :param tqdm_kwargs: Keyword arguments for the progress bar (tqdm).
         It can be used to resume the optimization process.
         """
         # enable logging of all information retrieved from the system
@@ -232,19 +239,79 @@ class RateConstantOptimizerTemplate(ABC):
             logger.log(pd.Series([x, total_error, predicted_compound_ratio], index=["x", "error", "ratio"]))
             return total_error
 
-        def update_tqdm(_):
-            """update the progress bar"""
-            pbar.update(1)
+        if pbar_show:
+            def update_tqdm(_):
+                """update the progress bar"""
+                pbar.update(1)
 
-        with tqdm(total=maxiter, miniters=25) as pbar:
+            with tqdm(total=maxiter, miniters=25, **tqdm_kwargs) as pbar:
+                # the minimization process is stored within the log, containing all x's and errors.
+                minimize(fun=optimization_step,
+                         x0=x0,
+                         method="Nelder-Mead",
+                         bounds=bounds,
+                         callback=update_tqdm,
+                         options={"maxiter": maxiter, "disp": True, "adaptive": True, "return_all": False,
+                                  "initial_simplex": resume_from_simplex})
+        else:
             # the minimization process is stored within the log, containing all x's and errors.
             minimize(fun=optimization_step,
                      x0=x0,
                      method="Nelder-Mead",
                      bounds=bounds,
-                     callback=update_tqdm,
                      options={"maxiter": maxiter, "disp": True, "adaptive": True, "return_all": False,
                               "initial_simplex": resume_from_simplex})
+
+    def multiprocessing_optimization(self,
+                                     path: str,
+                                     n_runs: int,
+                                     bounds: list[tuple[float, float]],
+                                     x_description: list[str],
+                                     maxiter: Optional[int] = None,
+                                     n_jobs: int = 1):
+        """
+        Optimizes the system, utilizing a nelder-mead algorithm.
+        :param path: Where the solution should be stored.
+        :param n_runs: The number of runs which are to be computed.
+        :param bounds: A list containing tuples, which in turn contain the lower and upper bound for each parameter.
+        :param x_description: Description of each parameter.
+        :param maxiter: The maximum number of iterations.
+        :param n_jobs: The number of processes which should be used, if -1 all available cores are used.
+        It can be used to resume the optimization process.
+        """
+        os.mkdir(f'{path}/optimization_multiple_guess')
+
+        r = Parallel(n_jobs=n_jobs, verbose=100)(delayed(self._mp_work_list)(seed, bounds, x_description, maxiter, path)
+                                                 for seed in range(n_runs))
+        print('finished multiprocessing!')
+
+        r = pd.DataFrame(r, columns=['seed', 'error'])
+        print(r)
+    
+    def _mp_work_list(self, seed, bounds, x_description, maxiter, path):
+        start_t = time.perf_counter()
+        print(f'Start of analysis on {seed}')
+
+        rng = np.random.default_rng(seed)
+        vertex = np.array([rng.random() * (ub - lb) + lb for lb, ub in bounds])
+        path = f'{path}/optimization_multiple_guess/guess_{seed}/'
+        os.mkdir(path)
+
+        self.optimize(
+            x0=vertex,
+            x_description=x_description,
+            bounds=bounds,
+            path=path,
+            maxiter=maxiter,
+            pbar_show=False,
+        )
+        progress = self.load_optimization_progress(path)
+        error = progress.best_error
+
+        end_t = time.perf_counter()
+        total_duration = end_t - start_t
+        print(f'optimized {seed:3d} with an error of {error:.4f} in {total_duration / 60:.4f} min')
+        return seed, error
 
     @staticmethod
     def load_optimization_progress(path: str) -> OptimizerProgress:
