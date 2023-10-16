@@ -287,7 +287,7 @@ class RateConstantOptimizerTemplate(ABC):
 
         r = pd.DataFrame(r, columns=['seed', 'error'])
         print(r)
-
+    
     def _mp_work_list(self, seed, bounds, x_description, maxiter, path):
         start_t = time.perf_counter()
         print(f'Start of analysis on {seed}')
