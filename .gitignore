@@ -1,3 +1,4 @@
 /.pypirc
 /venv/
 /tools
+pyproject.toml

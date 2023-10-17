@@ -8,6 +8,7 @@ import numpy as np
 from tqdm import tqdm
 from datetime import datetime
 
+import warnings
 import os
 import time
 from joblib import Parallel, delayed
@@ -57,9 +58,9 @@ class OptimizerProgress:
         self._all_ratios: pd.Series = df["ratio"]
         self._all_times: pd.Series = df["datetime"]
 
-        simplex = np.full((self.n_dimensions+1, self.n_dimensions), np.nan)
+        simplex = np.full((self.n_dimensions + 1, self.n_dimensions), np.nan)
         sorted_errors = self._all_errors.sort_values(ascending=True)
-        for n, index in enumerate(sorted_errors[:self.n_dimensions+1].keys()):
+        for n, index in enumerate(sorted_errors[:self.n_dimensions + 1].keys()):
             simplex[n, :] = self._all_X.iloc[index, :].to_numpy()  # underscored variant so that no copying is required
 
         best_iteration_index = sorted_errors.index[0]
@@ -262,32 +263,40 @@ class RateConstantOptimizerTemplate(ABC):
                      options={"maxiter": maxiter, "disp": True, "adaptive": True, "return_all": False,
                               "initial_simplex": resume_from_simplex})
 
-    def multiprocessing_optimization(self,
-                                     path: str,
-                                     n_runs: int,
-                                     bounds: list[tuple[float, float]],
-                                     x_description: list[str],
-                                     maxiter: Optional[int] = None,
-                                     n_jobs: int = 1):
+    def optimize_multiple(self,
+                          path: str,
+                          n_runs: int,
+                          bounds: list[tuple[float, float]],
+                          x_description: list[str],
+                          maxiter: Optional[int] = None,
+                          n_jobs: int = 1):
         """
-        Optimizes the system, utilizing a nelder-mead algorithm.
+        Optimizes the system, utilizing a nelder-mead algorithm, for a given number of runs. Each run has random
+        starting positions for each parameter, which is uniformly distributed between its lower and upper bounds.
+        If the given path already has an existing directory called 'optimization_multiple_guess', the optimization will
+        be resumed from that point onwards.
         :param path: Where the solution should be stored.
         :param n_runs: The number of runs which are to be computed.
         :param bounds: A list containing tuples, which in turn contain the lower and upper bound for each parameter.
         :param x_description: Description of each parameter.
         :param maxiter: The maximum number of iterations.
         :param n_jobs: The number of processes which should be used, if -1 all available cores are used.
-        It can be used to resume the optimization process.
         """
-        os.mkdir(f'{path}/optimization_multiple_guess')
+        try:
+            os.mkdir(f'{path}/optimization_multiple_guess')
+            start_seed = 0
+        except FileExistsError:
+            start_seed = len(os.listdir(f'{path}/optimization_multiple_guess'))
+            warnings.warn("Cannot create a directory when that directory already exists. "
+                          f"Appending results instead starting with seed {start_seed}")
 
         r = Parallel(n_jobs=n_jobs, verbose=100)(delayed(self._mp_work_list)(seed, bounds, x_description, maxiter, path)
-                                                 for seed in range(n_runs))
+                                                 for seed in range(start_seed, start_seed + n_runs))
         print('finished multiprocessing!')
 
         r = pd.DataFrame(r, columns=['seed', 'error'])
         print(r)
-    
+
     def _mp_work_list(self, seed, bounds, x_description, maxiter, path):
         start_t = time.perf_counter()
         print(f'Start of analysis on {seed}')

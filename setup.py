@@ -10,5 +10,6 @@ setup(
                       'numba',
                       'tqdm',
                       'openpyxl',
-                      'pandas'],
+                      'pandas',
+                      'joblib'],
 )
