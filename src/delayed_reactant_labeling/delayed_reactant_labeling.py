@@ -28,11 +28,12 @@ class Experimental_Conditions:
 
 
 @njit
-def _calculate_step(reaction_rate: np.ndarray,
-                    reaction_reactants: List[np.ndarray],
-                    reaction_products: List[np.ndarray],
-                    delta_time: float,
-                    concentrations: np.ndarray):
+def _calculate_steps(reaction_rate: np.ndarray,
+                     reaction_reactants: List[np.ndarray],
+                     reaction_products: List[np.ndarray],
+                     concentration: np.ndarray,
+                     time_slice: np.ndarray,
+                     steps_per_step: int):
     """
     Calculates a singular step using the Explicit Euler formula.
     Foreach defined reaction all reactants will be decreased by the 'created amount',
@@ -40,42 +41,26 @@ def _calculate_step(reaction_rate: np.ndarray,
     :param reaction_rate: Each element contains the rate constant values.
     :param reaction_reactants: Each element contains an array of the indices of which chemicals are the reactants.
     :param reaction_products: Each element contains an array of the indices of which chemicals are the products.
-    :param delta_time: The time step which is to be simulated.
-    :param concentrations: The current concentrations of each chemical.
+    :param concentration: The initial concentrations of each chemical.
+    :param time_slice: The points in time that must be examined.
+    :param steps_per_step: The number of simulations which are examined, for each point in the time slice.
     :return: The predicted concentrations.
     """
-    new_concentration = concentrations.copy()
-    for reaction_i in range(reaction_rate.shape[0]):
-        created_amount = delta_time * reaction_rate[reaction_i] * np.prod(
-            concentrations[reaction_reactants[reaction_i]])
-        new_concentration[reaction_reactants[reaction_i]] -= created_amount  # consumed
-        new_concentration[reaction_products[reaction_i]] += created_amount  # produced
-    return new_concentration
-
-
-@njit
-def _calculate_steps(reaction_rate: np.ndarray,
-                     reaction_reactants: List[np.ndarray],
-                     reaction_products: List[np.ndarray],
-                     concentration: np.ndarray,
-                     time_slice: np.ndarray, steps_per_step):
-    # assert steps per step >= 1
-
     prediction = np.empty((time_slice.shape[0], concentration.shape[0]))
-    prediction[0, :] = concentration  # should start with the initial concentrations
+    prediction[0, :] = concentration
 
-    # for each time step in the time slice
     for time_i in range(time_slice.shape[0] - 1):
         # Step over the total delta t in n steps per step. Discard the intermediate results.
         dt = (time_slice[time_i + 1] - time_slice[time_i]) / steps_per_step
         for _ in range(steps_per_step):
-            concentration = _calculate_step(
-                reaction_rate=reaction_rate,
-                reaction_reactants=reaction_reactants,
-                reaction_products=reaction_products,
-                concentrations=concentration,
-                delta_time=dt
-            )
+            new_concentration = concentration.copy()
+            for reaction_i in range(reaction_rate.shape[0]):
+                created_amount = dt * reaction_rate[reaction_i] * np.prod(concentration[reaction_reactants[reaction_i]])
+                new_concentration[reaction_reactants[reaction_i]] -= created_amount  # consumed
+                new_concentration[reaction_products[reaction_i]] += created_amount  # produced
+            concentration = new_concentration
+
+        # update each step
         prediction[time_i + 1, :] = concentration
     return prediction
 
