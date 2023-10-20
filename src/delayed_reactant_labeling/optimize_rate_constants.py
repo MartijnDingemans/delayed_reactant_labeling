@@ -174,7 +174,7 @@ class RateConstantOptimizerTemplate(ABC):
                  resume_from_simplex=None,
                  pbar_show=True,
                  **tqdm_kwargs
-                 ) -> None:
+                 ) -> bool:
         """
         Optimizes the system, utilizing a nelder-mead algorithm.
         :param x0: Parameters which are to be optimized. Always contain the rate constants.
@@ -186,7 +186,7 @@ class RateConstantOptimizerTemplate(ABC):
         :param resume_from_simplex: When a simplex is given, the solution starts here.
         :param pbar_show: If True, shows a progress bar.
         :param tqdm_kwargs: Keyword arguments for the progress bar (tqdm).
-        It can be used to resume the optimization process.
+        :return: Bool that indicates if the optimization ended in a normal manner (True -> no error occurred).
         """
         # enable logging of all information retrieved from the system
         log_path = f"{path}/optimization_log.json"
@@ -244,6 +244,8 @@ class RateConstantOptimizerTemplate(ABC):
                                   "initial_simplex": resume_from_simplex})
         except Exception as e:
             logger.log(pd.Series({'MAE': np.nan, 'exception': e}))
+            return False
+        return True
 
     def optimize_multiple(self,
                           path: str,
@@ -289,9 +291,6 @@ class RateConstantOptimizerTemplate(ABC):
             maxiter=maxiter,
             pbar_show=False,
         )
-        progress = self.load_optimization_progress(path)
-        error = progress.best_error
-        return seed, error
 
     @staticmethod
     def load_optimization_progress(path: str) -> OptimizerProgress:
