@@ -1,5 +1,5 @@
 import numpy as np
-import pandas as pd
+import polars as pl
 from dataclasses import dataclass
 from typing import Optional
 from numba import njit
@@ -82,12 +82,17 @@ class DRL:
         :param verbose: If True, it will print and store information on which reactions are intialized.
         """
         if verbose:
+            # Pandas is much more flexible when it comes to storing data. Especially lists in lists.
+            import pandas as pd
             df = []
             for k, reactants, products in reactions:
                 df.append(pd.Series([k, rate_constants[k], reactants, products],
                                     index=['k', 'k-value', 'reactants', 'products']))
             self.reactions = pd.DataFrame(df)
             print(self.reactions)
+
+        # Acts as a backup in which the rate constants are available in the same format as they were inputted.
+        self.rate_constants_input = rate_constants
 
         # link the name of a chemical with an index
         self.reference = set()
@@ -108,7 +113,6 @@ class DRL:
                 # computational benefits
                 continue
 
-            # human-readable string, machine executable function
             self.reaction_rate.append(rate_constants[k])
             self.reaction_reactants.append(np.array([self.reference[reactant] for reactant in reactants]))
             self.reaction_products.append(np.array([self.reference[product] for product in products]))
@@ -117,7 +121,7 @@ class DRL:
     def _predict_concentration_slice(self,
                                      initial_concentration: np.ndarray,
                                      time_slice: np.ndarray,
-                                     steps_per_step: int) -> tuple[pd.DataFrame, np.ndarray]:
+                                     steps_per_step: int) -> tuple[pl.DataFrame, np.ndarray]:
         """
         Predicts the concentration of a singular time slice.
         :param initial_concentration: The initial concentration of the system.
@@ -135,21 +139,16 @@ class DRL:
             time_slice=time_slice,
             steps_per_step=steps_per_step)
 
-        if np.min(predicted_concentration) < 0:
-            raise InvalidPredictionError(
-                "Negative concentrations were detected, perhaps this was caused by a large dt. "
-                "Consider increasing the steps_per_step.")
-
         # do some formatting
-        df_result = pd.DataFrame(predicted_concentration, columns=list(self.reference.keys()))
-        df_result["time"] = time_slice
+        df_result = pl.DataFrame(predicted_concentration, list(self.reference.keys()))
+        df_result = df_result.with_columns(pl.Series(name='time', values=time_slice))
 
         return df_result, predicted_concentration[-1, :]  # last prediction step
 
     def predict_concentration(self,
                               experimental_conditions: Experimental_Conditions,
                               steps_per_step: int = 1,
-                              ) -> tuple[pd.DataFrame, pd.DataFrame]:
+                              ) -> tuple[pl.DataFrame, pl.DataFrame]:
         """
         Predicts the concentration of a system, using the appropriate experimental conditions.
         :param experimental_conditions: Experimental Conditions object.
@@ -180,4 +179,18 @@ class DRL:
             time_slice=experimental_conditions.time[1],
             steps_per_step=steps_per_step
         )
+
+        # validate the results
+        if np.min(results_post_addition) < 0:
+            raise InvalidPredictionError(
+                "Negative concentrations were detected, perhaps this was caused by a large dt.\n"
+                "Consider increasing the steps_per_step. The applied rate constants are:\n"
+                f"{self.rate_constants_input}")
+        if np.isnan(results_post_addition[-1, :]).any():
+            raise InvalidPredictionError(
+                "NaN values were detected in the prediction, perhaps this was caused by a large dt.\n"
+                "Consider increasing the steps_per_step. The applied rate constants are:\n"
+                f"\n{self.rate_constants_input}"
+            )
+
         return result_pre_addition, results_post_addition

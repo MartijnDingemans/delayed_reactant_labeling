@@ -11,5 +11,6 @@ setup(
                       'tqdm',
                       'openpyxl',
                       'pandas',
+                      'polars',
                       'joblib'],
 )

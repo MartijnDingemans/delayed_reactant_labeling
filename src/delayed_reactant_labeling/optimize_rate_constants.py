@@ -1,16 +1,15 @@
+import os
+import warnings
+
+import polars as pl  # used for more efficient calculations in the dataframes.
+import pandas as pd  # used for storage of the data, its series objects are much more powerful.
+import numpy as np
+
 from abc import ABC, abstractmethod
 from typing import Optional, Callable
-
 from scipy.optimize import minimize
-from sklearn.metrics import mean_absolute_error
-import pandas as pd
-import numpy as np
 from tqdm import tqdm
 from datetime import datetime
-
-import warnings
-import os
-import time
 from joblib import Parallel, delayed
 
 
@@ -22,14 +21,14 @@ class JSON_log:
         if mode == "new":
             # create a new file
             if exists:
-                raise FileExistsError("File already exists. To replace it use mode='replace'")
+                raise FileExistsError(f"{path} already exists. To replace it use mode='replace'")
             with open(self._path, "w") as _:
                 pass
 
         elif mode == "append":
             # append to the file
             if not exists:
-                raise ValueError("File does not exist. Use mode='new' to create it.")
+                raise ValueError(f"{path} does not exist. Use mode='new' to create it.")
 
         elif mode == "replace":
             # replace the file
@@ -53,73 +52,50 @@ class OptimizerProgress:
         self.n_dimensions = len(self.x_description)
         self.n_iterations = len(df)
 
-        self._all_X: pd.DataFrame = pd.DataFrame(list(df.loc[:, "x"]), columns=self.x_description)
-        self._all_errors: pd.Series = df["error"]
-        self._all_ratios: pd.Series = df["ratio"]
-        self._all_times: pd.Series = df["datetime"]
+        self.all_X: pd.DataFrame = pd.DataFrame(list(df.loc[:, "x"]), columns=self.x_description)
+        self.all_errors: pd.Series = df["error"]
+        self.all_ratios: pd.Series = df["ratio"]
+        self.all_times: pd.Series = df["datetime"]
 
         simplex = np.full((self.n_dimensions + 1, self.n_dimensions), np.nan)
-        sorted_errors = self._all_errors.sort_values(ascending=True)
+        sorted_errors = self.all_errors.sort_values(ascending=True)
         for n, index in enumerate(sorted_errors[:self.n_dimensions + 1].keys()):
-            simplex[n, :] = self._all_X.iloc[index, :].to_numpy()  # underscored variant so that no copying is required
+            simplex[n, :] = self.all_X.iloc[index, :].to_numpy()  # underscored variant so that no copying is required
 
         best_iteration_index = sorted_errors.index[0]
 
-        self._best_X: pd.Series = pd.Series(self.all_X.loc[best_iteration_index, :], index=self.x_description)
+        self.best_X: pd.Series = pd.Series(self.all_X.loc[best_iteration_index, :], index=self.x_description)
         self.best_error: float = self.all_errors[best_iteration_index]
         self.best_ratio: float = self.all_ratios[best_iteration_index]
-
-    @property
-    def best_X(self):
-        return self._best_X.copy()
-
-    @property
-    def all_X(self):
-        return self._all_X.copy()
-
-    @property
-    def all_errors(self):
-        return self._all_errors.copy()
-
-    @property
-    def all_time_stamps(self):
-        return self._all_times.copy()
-
-    @property
-    def all_ratios(self):
-        return self._all_ratios.copy()
 
 
 class RateConstantOptimizerTemplate(ABC):
     def __init__(self,
                  raw_weights: dict[str, float],
-                 experimental: pd.DataFrame,
-                 metric: Optional[Callable[[np.ndarray, np.ndarray], float]] = None) -> None:
+                 experimental: pl.DataFrame,
+                 metric: Callable[[np.ndarray, np.ndarray], float]) -> None:
         """
         Initializes the Rate constant optimizer class.
-        :param raw_weights: dictionary containing str patterns as keys and the weight as values.
+        :param raw_weights: Dictionary containing str patterns as keys and the weight as values.
         The str patterns will be searched for in the keys of the results from the 'calculate_curves' function.
         The given weight will lower corresponding errors.
-        :param experimental: The experimental data
-        :param metric: The error metric which should be used, defaults to the mean absolute error.
+        :param experimental: Polars dataframe containing the experimental data.
+        :param metric: The error metric which should be used. It must implement y_true and y_pred as its arguments.
         """
         self.raw_weights = raw_weights
         self.weights = None
 
         # initialize all curves for the experimental (true) values.
         self.experimental_curves = self.calculate_curves(experimental)
-
-        if metric is None:
-            metric = mean_absolute_error
         self.metric = metric
 
         # check if any of the curves are potentially problematic
         for curve_description, curve in self.experimental_curves.items():
-            if any(np.isnan(curve)):
+            if curve.is_nan().any():
                 raise ValueError(f"Experimental data curve for {curve_description} contains NaN values.")
 
     @abstractmethod
-    def create_prediction(self, x: np.ndarray, x_description: list[str]) -> tuple[pd.DataFrame, float]:
+    def create_prediction(self, x: np.ndarray, x_description: list[str]) -> tuple[pl.DataFrame, float]:
         """
         Create a prediction of the system, given a set of parameters.
         :param x: Contains all parameters, which are to be optimized.
@@ -132,7 +108,7 @@ class RateConstantOptimizerTemplate(ABC):
 
     @staticmethod
     @abstractmethod
-    def calculate_curves(data: pd.DataFrame) -> dict[str, pd.Series]:
+    def calculate_curves(data: pl.DataFrame) -> dict[str, pl.Series]:
         """
         Calculate the curves corresponding to the data (either experimental or predicted).
         The experimental curves will only be calculated once and are stored for subsequent use.
@@ -141,15 +117,18 @@ class RateConstantOptimizerTemplate(ABC):
         :return: dict containing a description of each curve, and the corresponding curve.
         """
 
-    def calculate_error_functions(self, prediction: pd.DataFrame) -> pd.Series:
+    def calculate_error_functions(self, prediction: pl.DataFrame) -> pd.Series:
         """
         Calculate the error caused by each error function.
-        :param prediction: The predicted concentrations.
-        :return: The unweighted errors of each error function.
+        The input is of the format of polars due to its computational efficiency.
+        It returns a Pandas Series as those are more powerful to work with.
+        :param prediction: Polars dataframe containing the predicted concentrations.
+        :return: Pandas.Series containing the unweighted errors of each error function.
         """
         curves_predicted = self.calculate_curves(prediction)
         error = {}
         for curve_description, curve_prediction in curves_predicted.items():
+            # noinspection PyArgumentList
             error[curve_description] = self.metric(
                 y_true=self.experimental_curves[curve_description],
                 y_pred=curve_prediction)
@@ -162,7 +141,7 @@ class RateConstantOptimizerTemplate(ABC):
         :param errors: unweighted errors
         :return: weighed errors
         """
-        assert isinstance(errors, pd.Series)
+        # assert isinstance(errors, pl.Series)
         if self.weights is None:
             weights = np.ones(errors.shape)
             for description, weight in self.raw_weights.items():
@@ -217,9 +196,7 @@ class RateConstantOptimizerTemplate(ABC):
                 "bounds": bounds,
                 "maxiter": maxiter
             }
-            if metadata is None:
-                pass
-            else:
+            if metadata is not None:
                 # overwrites the default meta data values
                 for key, value in metadata.items():
                     metadata_extended[key] = value
@@ -232,7 +209,6 @@ class RateConstantOptimizerTemplate(ABC):
             """The function is given a set of parameters by the Nelder-Mead algorithm.
             Proceeds to calculate the corresponding prediction and its total error.
             The results are stored in a log before the error is returned to the optimizer."""
-
             prediction, predicted_compound_ratio = self.create_prediction(x, x_description)
             errors = self.calculate_error_functions(prediction)
             total_error = self.calculate_total_error(errors)
@@ -290,17 +266,10 @@ class RateConstantOptimizerTemplate(ABC):
             warnings.warn("Cannot create a directory when that directory already exists. "
                           f"Appending results instead starting with seed {start_seed}")
 
-        r = Parallel(n_jobs=n_jobs, verbose=100)(delayed(self._mp_work_list)(seed, bounds, x_description, maxiter, path)
-                                                 for seed in range(start_seed, start_seed + n_runs))
-        print('finished multiprocessing!')
-
-        r = pd.DataFrame(r, columns=['seed', 'error'])
-        print(r)
+        Parallel(n_jobs=n_jobs, verbose=100)(delayed(self._mp_work_list)(seed, bounds, x_description, maxiter, path)
+                                             for seed in range(start_seed, start_seed + n_runs))
 
     def _mp_work_list(self, seed, bounds, x_description, maxiter, path):
-        start_t = time.perf_counter()
-        print(f'Start of analysis on {seed}')
-
         rng = np.random.default_rng(seed)
         vertex = np.array([rng.random() * (ub - lb) + lb for lb, ub in bounds])
         path = f'{path}/optimization_multiple_guess/guess_{seed}/'
@@ -316,10 +285,6 @@ class RateConstantOptimizerTemplate(ABC):
         )
         progress = self.load_optimization_progress(path)
         error = progress.best_error
-
-        end_t = time.perf_counter()
-        total_duration = end_t - start_t
-        print(f'optimized {seed:3d} with an error of {error:.4f} in {total_duration / 60:.4f} min')
         return seed, error
 
     @staticmethod
