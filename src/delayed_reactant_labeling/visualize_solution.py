@@ -6,10 +6,10 @@ import pandas as pd
 from sklearn.decomposition import PCA
 from tqdm import tqdm
 from delayed_reactant_labeling.delayed_reactant_labeling import InvalidPredictionError
-from delayed_reactant_labeling.optimize_rate_constants import RateConstantOptimizerTemplate
+from delayed_reactant_labeling.optimize_rate_constants import RateConstantOptimizerTemplate, OptimizerProgress
 
 
-class VisualizeSolution:
+class VisualizeSingleSolution:
     def __init__(self,
                  path: str,
                  description: str,
@@ -106,7 +106,7 @@ class VisualizeSolution:
         return fig, axs
 
     def show_optimization_path_in_pca(self, create_3d_video: bool = False, fps: int = 30) -> tuple[
-            plt.Figure, list[plt.Axes]]:
+        plt.Figure, list[plt.Axes]]:
         # explore pca space
         fig = plt.figure(figsize=(8, 8))
         gs = fig.add_gridspec(2, 2, width_ratios=(1, 4), height_ratios=(4, 1),
@@ -206,7 +206,8 @@ class VisualizeSolution:
         fig.savefig(f"{self.path}bar_plot_of_all_errors.svg", dpi=self.dpi)
         return fig, ax
 
-    def show_enantiomer_ratio(self, intermediates: list[str], experimental: pd.DataFrame) -> tuple[plt.Figure, plt.Axes]:
+    def show_enantiomer_ratio(self, intermediates: list[str], experimental: pd.DataFrame) -> tuple[
+        plt.Figure, plt.Axes]:
         fig, ax = plt.subplots()
         ax.set_title(self.description)
         plotted_label = False
@@ -354,5 +355,118 @@ class VisualizeSolution:
         fig.tight_layout()
         fig.savefig(f"{self.path}sensitivity_of_rate.png", dpi=self.dpi)
         fig.savefig(f"{self.path}sensitivity_of_rate.svg", dpi=self.dpi)
+
+        return fig, ax
+
+
+class VisualizeMultipleSolutions:
+    def __init__(self, path, max_guess):
+        guess_files = os.listdir(path)
+
+        self.complete_all_X = []
+        self.complete_initial_X = []
+        self.complete_optimal_X = []
+        self.complete_found_error = []
+        self.complete_found_ee = []
+
+        for n, guess in tqdm(enumerate(guess_files)):
+            if n>max_guess:
+                break
+
+            guess_path = f"{path}{guess}"
+            progress = OptimizerProgress(guess_path)
+
+            self.complete_all_X.append(progress.all_X)
+            self.complete_initial_X.append(progress.all_X.iloc[0, :])
+            self.complete_optimal_X.append(progress.best_X)
+            self.complete_found_error.append(progress.best_error)
+            self.complete_found_ee.append(progress.best_ratio)
+
+    def show_summary_all_runs(self, top_n: int) -> tuple[plt.Figure, plt.Axes]:
+        fig, ax = plt.subplots(layout='tight')
+        ind = np.argsort(self.complete_found_error)[:top_n]
+        found_ratio = np.array(self.complete_found_ee)
+
+        error = np.array(self.complete_found_error)
+        error[error > 0.5] = 0.5
+
+        im = ax.scatter(np.arange(len(ind)),
+                        found_ratio[ind],
+                        c=np.array(self.complete_found_error)[ind])
+
+        fig.colorbar(im, ax=ax, label='error')
+        ax.set_xlabel('run number (sorted by error)')
+        ax.set_ylabel('ratio')
+        return fig, ax
+
+    def show_rate_constants(self, max_error: float, index_constant_values: np.ndarray) -> tuple[plt.Figure, plt.Axes]:
+        ind_allowed_error = np.array(self.complete_found_error) < max_error
+        df = pd.DataFrame(np.array(self.complete_optimal_X)[ind_allowed_error], columns=self.complete_optimal_X[0].index).loc[:, ~index_constant_values]
+
+        fig, ax = plt.subplots(layout="tight")
+        ax.boxplot(df)
+        ax.set_title("distribution of optimal rates")
+        _ = ax.set_xticks(1 + np.arange(len(df.columns)), df.columns, rotation=90)
+        ax.set_ylim(0.5e-6, 0.9e2)
+        ax.set_yscale("log")
+        ax.set_ylabel("value of k")
+        return fig, ax
+
+    def show_biplot(self,
+                    max_error: float,
+                    index_constant_values: np.ndarray,
+                    pc1: int = 0,
+                    pc2: int = 1,
+                    ax: plt.Axes = None):
+        if ax is None:
+            fig, ax = plt.subplots()
+        else:
+            fig = ax.figure
+
+        data = []
+        for error, initial, optimal in zip(self.complete_found_error, self.complete_initial_X, self.complete_optimal_X):
+            if error > max_error:
+                continue
+            data.append(initial)
+            data.append(optimal)
+
+        from sklearn.decomposition import PCA
+        from sklearn.preprocessing import StandardScaler
+
+        data = pd.DataFrame(data).reset_index(drop=True)  # by converting to df first, we assure that the columns are aligned
+        scaler = StandardScaler()
+        scaler.fit(X=data.to_numpy())  # scale each rate so its std deviation becomes 1
+        pca = PCA().fit(X=scaler.transform(data.to_numpy()))
+
+        # scores
+        for error, initial, optimal in zip(self.complete_found_error, self.complete_initial_X, self.complete_optimal_X):
+            if error > max_error:
+                continue
+            ax.scatter(
+                x=scaler.transform(initial.to_numpy().reshape(1, -1)).dot(pca.components_[pc1]),
+                y=scaler.transform(initial.to_numpy().reshape(1, -1)).dot(pca.components_[pc2]),
+                marker='o', color='tab:blue'
+            )
+            ax.scatter(
+                x=scaler.transform(optimal.to_numpy().reshape(1, -1)).dot(pca.components_[pc1]),
+                y=scaler.transform(optimal.to_numpy().reshape(1, -1)).dot(pca.components_[pc2]),
+                marker='*', color='tab:orange'
+            )
+        ax.scatter(np.nan, np.nan, color="tab:blue", marker="o", label="initial")
+        ax.scatter(np.nan, np.nan, color="tab:orange", marker="*", label="optimal")
+        ax.legend()
+
+        # maximize the size of the loadings
+        x_factor = abs(np.array(ax.get_xlim())).min() / pca.components_[pc1].max()
+        y_factor = abs(np.array(ax.get_ylim())).min() / pca.components_[pc2].max()
+
+        # loadings
+        for rate, loading1, loading2 in zip(data.columns, pca.components_[pc1], pca.components_[pc2]):
+            ax.plot([0, loading1*x_factor], [0, loading2*y_factor], color='tab:gray')
+            ax.text(loading1*x_factor, loading2*y_factor, rate, ha='center', va='bottom')
+
+        ax.set_title('biplot')
+        ax.set_xlabel(f'PC {pc1}, explained variance {pca.explained_variance_ratio_[pc1]:.2f}')
+        ax.set_ylabel(f'PC {pc2}, explained variance {pca.explained_variance_ratio_[pc2]:.2f}')
 
         return fig, ax
