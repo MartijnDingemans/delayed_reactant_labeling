@@ -206,8 +206,8 @@ class VisualizeSingleSolution:
         fig.savefig(f"{self.path}bar_plot_of_all_errors.svg", dpi=self.dpi)
         return fig, ax
 
-    def show_enantiomer_ratio(self, intermediates: list[str], experimental: pd.DataFrame) -> tuple[
-        plt.Figure, plt.Axes]:
+    def show_enantiomer_ratio(self, intermediates: list[str], experimental: pd.DataFrame) -> tuple[plt.Figure, plt.Axes]:
+        from polars.exceptions import ColumnNotFoundError
         fig, ax = plt.subplots()
         ax.set_title(self.description)
         plotted_label = False
@@ -218,7 +218,8 @@ class VisualizeSingleSolution:
                     label = f"predicted {isomer}"
                 else:
                     label = None
-                y_pred = self.best_prediction[f"{intermediate}{isomer}"].divide(total_pred).iloc[-60:].mean()
+                y_pred = self.best_prediction[f"{intermediate}{isomer}"] / total_pred
+                y_pred = y_pred[-60:].mean()
                 ax.scatter(x, y_pred, label=label, marker="^", alpha=0.7, color=f"C{i}")
                 ax.text(x + 0.07, y_pred, f"{y_pred * 100:.1f}%", ha="left", va="center")
             plotted_label = True
@@ -233,10 +234,11 @@ class VisualizeSingleSolution:
                         label = f"experimental {isomer}"
                     else:
                         label = None
-                    y_exp = experimental[f"{intermediate}{isomer}"].divide(total_exp).iloc[-60:].mean()
+                    y_exp = experimental[f"{intermediate}{isomer}"] / total_exp
+                    y_exp = y_exp[-60:].mean()
                     ax.scatter(x, y_exp, label=label, marker="x", alpha=0.7, color=f"C{i}")
                 plotted_label = True
-            except KeyError:
+            except ColumnNotFoundError:
                 print(f"could not find {intermediate} in the experimental data. skipping...")
 
         ax.set_ylabel("isomer fraction")
@@ -320,18 +322,16 @@ class VisualizeSingleSolution:
         for col, key in enumerate(tqdm(self.progress.best_X[~self.index_constant_values].keys())):
             for row, adjusted_x in enumerate(x_value):
                 # insert all values into the plot
-                best_X = self.progress.best_X
+                best_X = self.progress.best_X.copy()
                 best_X[key] = adjusted_x
-
                 try:
                     prediction = self.rate_constant_optimizer.create_prediction(
                         x=best_X.to_numpy(), x_description=self.progress.x_description)[0]
-                    found_error = self.rate_constant_optimizer.calculate_error_functions(prediction)
+                    unweighed_error = self.rate_constant_optimizer.calculate_error_functions(prediction)
+                    found_error = self.rate_constant_optimizer.calculate_total_error(unweighed_error)
                 except InvalidPredictionError as e:
-                    print('InvalidPredictionError: ', e)
                     found_error = np.nan
-
-                errors[row, col] = self.rate_constant_optimizer.calculate_total_error(found_error)
+                errors[row, col] = found_error
 
         min_error = np.nanmin(errors)
         errors[errors > threshold * min_error] = threshold * min_error

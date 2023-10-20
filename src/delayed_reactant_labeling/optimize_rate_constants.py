@@ -12,6 +12,8 @@ from tqdm import tqdm
 from datetime import datetime
 from joblib import Parallel, delayed
 
+from delayed_reactant_labeling.delayed_reactant_labeling import InvalidPredictionError
+
 
 class JSON_log:
     def __init__(self, path, mode="new"):
@@ -217,28 +219,31 @@ class RateConstantOptimizerTemplate(ABC):
             logger.log(pd.Series([x, total_error, predicted_compound_ratio], index=["x", "error", "ratio"]))
             return total_error
 
-        if pbar_show:
-            def update_tqdm(_):
-                """update the progress bar"""
-                pbar.update(1)
+        try:
+            if pbar_show:
+                def update_tqdm(_):
+                    """update the progress bar"""
+                    pbar.update(1)
 
-            with tqdm(total=maxiter, miniters=25, **tqdm_kwargs) as pbar:
+                with tqdm(total=maxiter, miniters=25, **tqdm_kwargs) as pbar:
+                    # the minimization process is stored within the log, containing all x's and errors.
+                    minimize(fun=optimization_step,
+                             x0=x0,
+                             method="Nelder-Mead",
+                             bounds=bounds,
+                             callback=update_tqdm,
+                             options={"maxiter": maxiter, "disp": True, "adaptive": True, "return_all": False,
+                                      "initial_simplex": resume_from_simplex})
+            else:
                 # the minimization process is stored within the log, containing all x's and errors.
                 minimize(fun=optimization_step,
                          x0=x0,
                          method="Nelder-Mead",
                          bounds=bounds,
-                         callback=update_tqdm,
                          options={"maxiter": maxiter, "disp": True, "adaptive": True, "return_all": False,
                                   "initial_simplex": resume_from_simplex})
-        else:
-            # the minimization process is stored within the log, containing all x's and errors.
-            minimize(fun=optimization_step,
-                     x0=x0,
-                     method="Nelder-Mead",
-                     bounds=bounds,
-                     options={"maxiter": maxiter, "disp": True, "adaptive": True, "return_all": False,
-                              "initial_simplex": resume_from_simplex})
+        except Exception as e:
+            logger.log(pd.Series({'MAE': np.nan, 'exception': e}))
 
     def optimize_multiple(self,
                           path: str,
