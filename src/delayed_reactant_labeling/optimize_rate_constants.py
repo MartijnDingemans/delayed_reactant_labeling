@@ -94,8 +94,9 @@ class RateConstantOptimizerTemplate(ABC):
             if curve.is_nan().any():
                 raise ValueError(f"Experimental data curve for {curve_description} contains NaN values.")
 
+    @staticmethod
     @abstractmethod
-    def create_prediction(self, x: np.ndarray, x_description: list[str]) -> tuple[pl.DataFrame, float]:
+    def create_prediction(x: np.ndarray, x_description: list[str]) -> tuple[pl.DataFrame, float]:
         """
         Create a prediction of the system, given a set of parameters.
         :param x: Contains all parameters, which are to be optimized.
