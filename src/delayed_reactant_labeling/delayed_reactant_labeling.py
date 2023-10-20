@@ -181,12 +181,12 @@ class DRL:
         )
 
         # validate the results
-        if np.min(results_post_addition) < 0:
+        if results_post_addition.to_numpy().min() < 0:
             raise InvalidPredictionError(
                 "Negative concentrations were detected, perhaps this was caused by a large dt.\n"
                 "Consider increasing the steps_per_step. The applied rate constants are:\n"
                 f"{self.rate_constants_input}")
-        if np.isnan(results_post_addition[-1, :]).any():
+        if np.isnan(results_post_addition.tail(1)).any():
             raise InvalidPredictionError(
                 "NaN values were detected in the prediction, perhaps this was caused by a large dt.\n"
                 "Consider increasing the steps_per_step. The applied rate constants are:\n"
