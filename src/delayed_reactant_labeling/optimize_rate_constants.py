@@ -252,8 +252,8 @@ class RateConstantOptimizerTemplate(ABC):
                           n_runs: int,
                           bounds: list[tuple[float, float]],
                           x_description: list[str],
-                          maxiter: Optional[int] = None,
-                          n_jobs: int = 1):
+                          n_jobs: int = 1,
+                          **optimize_kwargs):
         """
         Optimizes the system, utilizing a nelder-mead algorithm, for a given number of runs. Each run has random
         starting positions for each parameter, which is uniformly distributed between its lower and upper bounds.
@@ -263,8 +263,8 @@ class RateConstantOptimizerTemplate(ABC):
         :param n_runs: The number of runs which are to be computed.
         :param bounds: A list containing tuples, which in turn contain the lower and upper bound for each parameter.
         :param x_description: Description of each parameter.
-        :param maxiter: The maximum number of iterations.
         :param n_jobs: The number of processes which should be used, if -1 all available cores are used.
+        :param optimize_kwargs: The key word arguments that will be passed to self.optimize.
         """
         try:
             os.mkdir(f'{path}/optimization_multiple_guess')
@@ -274,10 +274,10 @@ class RateConstantOptimizerTemplate(ABC):
             warnings.warn("Cannot create a directory when that directory already exists. "
                           f"Appending results instead starting with seed {start_seed}")
 
-        Parallel(n_jobs=n_jobs, verbose=100)(delayed(self._mp_work_list)(seed, bounds, x_description, maxiter, path)
+        Parallel(n_jobs=n_jobs, verbose=100)(delayed(self._mp_work_list)(seed, bounds, x_description, path, optimize_kwargs)
                                              for seed in range(start_seed, start_seed + n_runs))
 
-    def _mp_work_list(self, seed, bounds, x_description, maxiter, path):
+    def _mp_work_list(self, seed, bounds, x_description, path, optimize_kwargs):
         rng = np.random.default_rng(seed)
         vertex = np.array([rng.random() * (ub - lb) + lb for lb, ub in bounds])
         path = f'{path}/optimization_multiple_guess/guess_{seed}/'
@@ -288,8 +288,8 @@ class RateConstantOptimizerTemplate(ABC):
             x_description=x_description,
             bounds=bounds,
             path=path,
-            maxiter=maxiter,
             pbar_show=False,
+            **optimize_kwargs
         )
 
     @staticmethod
