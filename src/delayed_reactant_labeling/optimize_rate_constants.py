@@ -296,7 +296,7 @@ class RateConstantOptimizerTemplate(ABC):
                 **optimize_kwargs
             )
         except InvalidPredictionError:
-            pass  # results are stored, t
+            pass  # results are stored incase an error occurred.
 
     @staticmethod
     def load_optimization_progress(path: str) -> OptimizerProgress:
