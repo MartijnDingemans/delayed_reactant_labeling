@@ -1,16 +1,15 @@
 import os
 import warnings
-
-import polars as pl  # used for more efficient calculations in the dataframes.
-import pandas as pd  # used for storage of the data, its series objects are much more powerful.
-import numpy as np
-
 from abc import ABC, abstractmethod
+from datetime import datetime
 from typing import Optional, Callable
+
+import numpy as np
+import pandas as pd  # used for storage of the data, its series objects are much more powerful.
+import polars as pl  # used for more efficient calculations in the dataframes.
+from joblib import Parallel, delayed
 from scipy.optimize import minimize
 from tqdm import tqdm
-from datetime import datetime
-from joblib import Parallel, delayed
 
 from delayed_reactant_labeling.delayed_reactant_labeling import InvalidPredictionError
 
@@ -173,8 +172,9 @@ class RateConstantOptimizerTemplate(ABC):
                  maxiter: float = 50000,
                  resume_from_simplex=None,
                  pbar_show=True,
+                 _overwrite_log=False,
                  **tqdm_kwargs
-                 ) -> bool:
+                 ) -> None:
         """
         Optimizes the system, utilizing a nelder-mead algorithm.
         :param x0: Parameters which are to be optimized. Always contain the rate constants.
@@ -186,12 +186,15 @@ class RateConstantOptimizerTemplate(ABC):
         :param resume_from_simplex: When a simplex is given, the solution starts here.
         :param pbar_show: If True, shows a progress bar.
         :param tqdm_kwargs: Keyword arguments for the progress bar (tqdm).
-        :return: Bool that indicates if the optimization ended in a normal manner (True -> no error occurred).
+        :param _overwrite_log: If True, the logs will be overwritten.
+            Should only be used in test scripts to avoid accidental loss of data.
         """
+        log_mode = "new" if not _overwrite_log else "replace"
+
         # enable logging of all information retrieved from the system
         log_path = f"{path}/optimization_log.json"
         if resume_from_simplex is None:  # new optimization progres
-            logger = JSON_log(log_path)
+            logger = JSON_log(log_path, mode=log_mode)
             metadata_extended = {
                 "raw_weights": self.raw_weights,
                 "x0": x0,
@@ -203,7 +206,7 @@ class RateConstantOptimizerTemplate(ABC):
                 # overwrites the default meta data values
                 for key, value in metadata.items():
                     metadata_extended[key] = value
-            meta_data_log = JSON_log(f"{path}/settings_info.json", mode="new")
+            meta_data_log = JSON_log(f"{path}/settings_info.json", mode=log_mode)
             meta_data_log.log(pd.Series(metadata_extended))
         else:
             logger = JSON_log(log_path, mode="append")
@@ -244,8 +247,7 @@ class RateConstantOptimizerTemplate(ABC):
                                   "initial_simplex": resume_from_simplex})
         except Exception as e:
             logger.log(pd.Series({'MAE': np.nan, 'exception': e}))
-            return False
-        return True
+            raise e
 
     def optimize_multiple(self,
                           path: str,
@@ -274,8 +276,9 @@ class RateConstantOptimizerTemplate(ABC):
             warnings.warn("Cannot create a directory when that directory already exists. "
                           f"Appending results instead starting with seed {start_seed}")
 
-        Parallel(n_jobs=n_jobs, verbose=100)(delayed(self._mp_work_list)(seed, bounds, x_description, path, optimize_kwargs)
-                                             for seed in range(start_seed, start_seed + n_runs))
+        Parallel(n_jobs=n_jobs, verbose=100)(
+            delayed(self._mp_work_list)(seed, bounds, x_description, path, optimize_kwargs)
+            for seed in range(start_seed, start_seed + n_runs))
 
     def _mp_work_list(self, seed, bounds, x_description, path, optimize_kwargs):
         rng = np.random.default_rng(seed)
@@ -283,14 +286,17 @@ class RateConstantOptimizerTemplate(ABC):
         path = f'{path}/optimization_multiple_guess/guess_{seed}/'
         os.mkdir(path)
 
-        self.optimize(
-            x0=vertex,
-            x_description=x_description,
-            bounds=bounds,
-            path=path,
-            pbar_show=False,
-            **optimize_kwargs
-        )
+        try:
+            self.optimize(
+                x0=vertex,
+                x_description=x_description,
+                bounds=bounds,
+                path=path,
+                pbar_show=False,
+                **optimize_kwargs
+            )
+        except InvalidPredictionError:
+            pass  # results are stored, t
 
     @staticmethod
     def load_optimization_progress(path: str) -> OptimizerProgress:

@@ -1,5 +1,6 @@
 import numpy as np
 import polars as pl
+import pandas as pd
 from dataclasses import dataclass
 from typing import Optional
 from numba import njit
@@ -71,7 +72,7 @@ class DRL:
 
     def __init__(self,
                  reactions: list[tuple[str, list[str], list[str]]],
-                 rate_constants: dict[str: float],
+                 rate_constants: dict[str, float] | pd.Series,
                  verbose=False):
         """Initialize the chemical system.
         :param reactions: List of reactions, each reaction is given as a tuple.
@@ -83,7 +84,6 @@ class DRL:
         """
         if verbose:
             # Pandas is much more flexible when it comes to storing data. Especially lists in lists.
-            import pandas as pd
             df = []
             for k, reactants, products in reactions:
                 df.append(pd.Series([k, rate_constants[k], reactants, products],
@@ -92,7 +92,7 @@ class DRL:
             print(self.reactions)
 
         # Acts as a backup in which the rate constants are available in the same format as they were inputted.
-        self.rate_constants_input = rate_constants
+        self.rate_constants_input = pd.Series(rate_constants)
 
         # link the name of a chemical with an index
         self.reference = set()
