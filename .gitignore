@@ -2,3 +2,7 @@
 /venv/
 /tools
 pyproject.toml
+/.idea/
+/src/delayed_reactant_labeling.egg-info/
+/docs/build/
+/dist/
