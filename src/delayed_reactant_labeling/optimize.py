@@ -11,7 +11,7 @@ from joblib import Parallel, delayed
 from scipy.optimize import minimize
 from tqdm import tqdm
 
-from delayed_reactant_labeling.delayed_reactant_labeling import InvalidPredictionError
+from delayed_reactant_labeling.predict import InvalidPredictionError
 
 
 class JSON_log:
@@ -91,9 +91,12 @@ class RateConstantOptimizerTemplate(ABC):
         self.metric = metric
 
         # check if any of the curves are potentially problematic
+        errors = []  #
         for curve_description, curve in self.experimental_curves.items():
             if curve.is_nan().any():
-                raise ValueError(f"Experimental data curve for {curve_description} contains NaN values.")
+                errors.append(f"Experimental data curve for {curve_description} contains {curve.is_nan()} NaN values.")
+        if errors:
+            raise ValueError("\n".join(errors))
 
     @staticmethod
     @abstractmethod

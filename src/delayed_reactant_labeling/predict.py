@@ -19,7 +19,6 @@ class Experimental_Conditions:
     initial_concentrations: dict[str, float]
     dilution_factor: float
     labeled_reactant: dict[str, float]
-    mass_balance: Optional[list[str]] = None
 
     def __post_init__(self):
         """Check the elements of the time array, to prevent pd.Series objects being passed through."""
@@ -68,7 +67,10 @@ def _calculate_steps(reaction_rate: np.ndarray,
 
 class DRL:
     """Class which enables efficient prediction of changes in concentration in a chemical system.
-    Especially useful for Delayed Reactant Labeling (DRL) experiments."""
+    Especially useful for Delayed Reactant Labeling (DRL) experiments.
+
+    :ivar reactions_overview: stores the reactions that will be calculated if the verbose argument was true upon initialization.
+    """
 
     def __init__(self,
                  reactions: list[tuple[str, list[str], list[str]]],
@@ -88,8 +90,8 @@ class DRL:
             for k, reactants, products in reactions:
                 df.append(pd.Series([k, rate_constants[k], reactants, products],
                                     index=['k', 'k-value', 'reactants', 'products']))
-            self.reactions = pd.DataFrame(df)
-            print(self.reactions)
+            self.reactions_overview = pd.DataFrame(df)
+            print(self.reactions_overview)
 
         # Acts as a backup in which the rate constants are available in the same format as they were inputted.
         self.rate_constants_input = pd.Series(rate_constants)

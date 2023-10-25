@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
 from tqdm import tqdm
-from delayed_reactant_labeling.delayed_reactant_labeling import InvalidPredictionError
-from delayed_reactant_labeling.optimize_rate_constants import RateConstantOptimizerTemplate, OptimizerProgress
+from delayed_reactant_labeling.predict import InvalidPredictionError
+from delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate, OptimizerProgress
 
 
 class VisualizeSingleSolution:
