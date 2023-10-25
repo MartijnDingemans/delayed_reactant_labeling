@@ -5,8 +5,6 @@ from numba import njit
 from numba.typed import List
 from scipy.integrate import solve_ivp
 
-
-raise NotImplementedError
 # this doesnt work for idk what reason
 # TODO compare jac with finite diff aproximation
 
@@ -53,24 +51,15 @@ def jac(concentrations: np.ndarray,
     for r in range(len(reaction_rates)):
         reactants = reaction_reactants[r]
         products = reaction_products[r]
-
         rate = reaction_rates[r]
 
-        chemicals = np.append(reactants, products)
-        for chemical_i in chemicals:
-            for chemical_j in chemicals:
-                if any(chemical_i == reactants):
-                    sign = -1  # consumed by this sub reaction
-                else:
-                    sign = +1  # produced by this sub reaction
+        for chemical_i in reactants:
+            for chemical_j in reactants:
+                _jac[chemical_i, chemical_j] -= rate * np.prod(reactants[chemical_j != reactants])
 
-                eq = chemical_j == reactants
-                if any(eq):
-                    _reactants = reactants[~eq]  # only use all non-chemical_j reactants; this is a differentiation step
-                else:
-                    _reactants = reactants
-
-                _jac[chemical_i, chemical_j] += rate * np.prod(concentrations[_reactants])
+        for chemical_i in products:
+            for chemical_j in reactants:
+                _jac[chemical_i, chemical_j] += rate * np.prod(reactants[chemical_j != reactants])
     return _jac
 
 
