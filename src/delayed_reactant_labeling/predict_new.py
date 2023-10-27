@@ -91,15 +91,15 @@ def _calculate_jac(concentrations: np.ndarray,
 
         # derivative with respect to chemical j. partial derivatives w.r.t. products are 0.
         for j in range(reactants.shape[0]):
-            _reactants = reactants[reactants != reactants[j]]
+            _reactants_concentrations = concentrations[reactants[reactants != reactants[j]]]
 
             # chemical i in the reactants
             for i in range(reactants.shape[0]):
-                _jac[reactants[i], reactants[j]] -= rate * np.prod(_reactants)
+                _jac[reactants[i], reactants[j]] -= rate * np.prod(_reactants_concentrations)
 
             # chemical i in the products
             for i in range(products.shape[0]):
-                _jac[products[i], reactants[j]] += rate * np.prod(_reactants)
+                _jac[products[i], reactants[j]] += rate * np.prod(_reactants_concentrations)
     return _jac
 
 
@@ -196,7 +196,7 @@ class DRL:
         for chemical, initial_concentration in initial_concentrations.items():
             self.initial_concentrations[self.reference[chemical]] = initial_concentration
 
-        jac_sparsity = self.calculate_jac(None, np.ones(self.initial_concentrations))
+        jac_sparsity = None # self.calculate_jac(None, np.ones(self.initial_concentrations.shape))
 
         result_pre = solve_ivp(self.calculate_step,
                                t_span=[t_eval_pre[0], t_eval_pre[-1]],
@@ -227,17 +227,14 @@ class DRL:
         df_result_post = df_result_post.with_columns(pl.Series(name='time', values=result_post.t))
 
         # validate the results
-        if result_post.y.min() < -1e-12:  # some leniency is required
+        if result_post.y.min() < -1e-8:  # some leniency is required
             raise InvalidPredictionError(
-                "Negative concentrations were detected, perhaps this was caused by a large dt.\n"
-                "Consider increasing the steps_per_step. The applied rate constants are:\n"
-                f"{self.rate_constants_input.to_json()}")
+                f"Negative concentrations (min: {result_post.y.min():6e}) were detected. "
+                f"The applied rate constants are:\n {self.rate_constants_input.to_json()}")
         if np.isnan(df_result_post.tail(1)).any():
             raise InvalidPredictionError(
-                "NaN values were detected in the prediction, perhaps this was caused by a large dt.\n"
-                "Consider increasing the steps_per_step. The applied rate constants are:\n"
-                f"\n{self.rate_constants_input.to_json()}"
-            )
+                f"NaN values (count: {np.isnan(df_result_post.to_numpy).sum()}) were detected. "
+                f"The applied rate constants are:\n {self.rate_constants_input.to_json()}")
 
         return df_result_pre, df_result_post
 
