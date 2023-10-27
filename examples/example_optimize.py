@@ -2,7 +2,10 @@ from copy import deepcopy
 
 import numpy as np
 import polars as pl
+import pandas as pd
+import matplotlib.pyplot as plt
 
+from icecream import ic
 from src.delayed_reactant_labeling.predict_new import DRL
 from src.delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate
 
@@ -155,12 +158,14 @@ class RateConstantOptimizer(RateConstantOptimizerTemplate):
                   verbose=False)  # stores values in drl.reactions which describe which reactant and products react.
 
         # prediction unlabeled is unused
-        prediction_unlabeled, prediction_labeled = drl.predict_concentration_Euler(
+        prediction_unlabeled, prediction_labeled = drl.predict_concentration(
             t_eval_pre=time_pre,
             t_eval_post=time,
             initial_concentrations=CONCENTRATIONS_INITIAL,
             labeled_concentration=CONCENTRATION_LABELED_REACTANT,
             dilution_factor=DILUTION_FACTOR,
+            rtol=1e-6,
+            atol=1e-6,
         )
 
         # SYSTEM-SPECIFIC ENAMINE IONIZATION CORRECTION -> only a prediction of 4/5 can be made!
@@ -178,11 +183,49 @@ class RateConstantOptimizer(RateConstantOptimizerTemplate):
 
 RCO = RateConstantOptimizer(raw_weights=WEIGHTS, experimental=experimental, metric=METRIC)
 
+
+# these rate constants were found by Roelant et al. and are used as a example only
+rate_constants_roelant = {
+    "k1_D": 1.5,
+    "k1_E": 0.25,
+    "k1_F": 0.01,
+    "k2_D": 0.43,
+    "k2_E": 0.638,
+    "k2_F": 0.567,
+    "k3_D": 0.23,
+    "k3_E": 0.35,
+    "k3_F": 0.3,
+    "k4_D": 8,
+    "k4_E": 0.05,
+    "k4_F": 0.03,
+    "k-1_D": 0,
+    "k-1_E": 0,
+    "k-1_F": 0,
+    "k-2_D": 0.025,
+    "k-2_E": 0.035,
+    "k-2_F": 0.03,
+    "k-3_D": 0,
+    "k-3_E": 0,
+    "k-3_F": 0,
+    "k-4_D": 0,
+    "k-4_E": 0,
+    "k-4_F": 0,
+}
+
+# define your inputs
+x = np.array(list(rate_constants_roelant.values()) + [0.025])
+x_description = list(rate_constants_roelant.keys()) + ['ion']
+labeled_prediction = RCO.create_prediction(x=x, x_description=x_description)[0]  # prediction
+errors = RCO.calculate_error_functions(labeled_prediction)
+weighed_errors = RCO.weigh_errors(errors)
+
+df = pd.DataFrame([errors, weighed_errors], index=["normal", "weighed"]).T
+print(df)
+ic(weighed_errors.sum())
+
+
 # the rate constant optimizer class is independent of your predicted run.
 x_description = rate_constant_names + ['ion']
-
-import pandas as pd
-
 constraints = pd.DataFrame(np.full((3, len(x_description)), np.nan), index=["vertex", "lower", "upper"],
                            columns=x_description).T
 
@@ -239,5 +282,6 @@ vertex = constraints['vertex'].to_numpy()
 RCO.optimize(path=r'C:\Users\mdingemans\delayed_reactant_labeling\tools\optimize',
              x0=vertex,
              bounds=bounds,
-             x_description=x_description, maxiter=1000,
+             x_description=x_description, maxiter=200,
              _overwrite_log=True)
+
