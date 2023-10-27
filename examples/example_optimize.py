@@ -164,8 +164,8 @@ class RateConstantOptimizer(RateConstantOptimizerTemplate):
             initial_concentrations=CONCENTRATIONS_INITIAL,
             labeled_concentration=CONCENTRATION_LABELED_REACTANT,
             dilution_factor=DILUTION_FACTOR,
-            rtol=1e-6,
-            atol=1e-6,
+            rtol=1e-10,
+            atol=1e-10,
         )
 
         # SYSTEM-SPECIFIC ENAMINE IONIZATION CORRECTION -> only a prediction of 4/5 can be made!

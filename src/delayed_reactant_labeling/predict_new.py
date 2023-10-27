@@ -180,17 +180,18 @@ class DRL:
                               initial_concentrations: dict[str, float],
                               labeled_concentration: dict[str, float],
                               dilution_factor: float,
-                              ivp_method: str = "Radau",
-                              **solve_ivp_kw):
+                              atol: float = 1e-10,
+                              rtol: float = 1e-10):
         """
         Predicts the concentrations during a DRL experiment.
+        It utilizes the ODE solver 'scipy.integrate.solve_ivp' with the Radau method.
         :param t_eval_pre: The time steps that must be evaluated and returned before the addition of the labeled compound.
         :param t_eval_post:  The time steps that must be evaluated and returned after the addition of the labeled compound.
         :param initial_concentrations: The initial concentrations of each chemical. Non-zero concentrations are not required.
         :param labeled_concentration: The concentration of the labeled chemical. This concentration is not diluted.
         :param dilution_factor: The factor (<1) by which the prediction will be 'diluted' when the labeled chemical is added.
-        :param ivp_method: The method used by scipy.integrate.solve_ivp. LSODA (default) has automatic stiffness detection.
-        :param solve_ivp_kw: All keyword arguments will be passed to scipy.integrate.solve_ivp.
+        :param atol: The absolute tolerances for the ODE solver.
+        :param rtol: The relative tolerances for the ODE solver.
         """
         # modify the stored initial concentration to match with input.
         for chemical, initial_concentration in initial_concentrations.items():
@@ -203,9 +204,10 @@ class DRL:
                                t_eval=t_eval_pre,
                                y0=self.initial_concentrations,
                                jac=self.calculate_jac,
-                               method=ivp_method,
+                               method='Radau',
                                jac_sparsity=jac_sparsity,
-                               **solve_ivp_kw)
+                               atol=atol,
+                               rtol=rtol)
         df_result_pre = pl.DataFrame(result_pre.y, list(self.reference.keys()))
         df_result_pre = df_result_pre.with_columns(pl.Series(name='time', values=result_pre.t))
 
@@ -219,15 +221,16 @@ class DRL:
                                 t_span=[t_eval_post[0], t_eval_post[-1]],
                                 t_eval=t_eval_post,
                                 y0=diluted_concentrations,
-                                method=ivp_method,
+                                method='Radau',
                                 jac=self.calculate_jac,
                                 jac_sparsity=jac_sparsity,
-                                **solve_ivp_kw)
+                                atol=atol,
+                                rtol=rtol)
         df_result_post = pl.DataFrame(result_post.y, list(self.reference.keys()))
         df_result_post = df_result_post.with_columns(pl.Series(name='time', values=result_post.t))
 
         # validate the results
-        if result_post.y.min() < -1e-8:  # some leniency is required
+        if result_post.y.min() < -max([atol, rtol]):  # errors up to the given tolerance are allowed.
             raise InvalidPredictionError(
                 f"Negative concentrations (min: {result_post.y.min():6e}) were detected. "
                 f"The applied rate constants are:\n {self.rate_constants_input.to_json()}")
