@@ -55,7 +55,6 @@ class OptimizerProgress:
 
         self.all_X: pd.DataFrame = pd.DataFrame(list(df.loc[:, "x"]), columns=self.x_description)
         self.all_errors: pd.Series = df["error"]
-        self.all_ratios: pd.Series = df["ratio"]
         self.all_times: pd.Series = df["datetime"]
 
         simplex = np.full((self.n_dimensions + 1, self.n_dimensions), np.nan)
@@ -67,7 +66,6 @@ class OptimizerProgress:
 
         self.best_X: pd.Series = pd.Series(self.all_X.loc[best_iteration_index, :], index=self.x_description)
         self.best_error: float = self.all_errors[best_iteration_index]
-        self.best_ratio: float = self.all_ratios[best_iteration_index]
 
 
 class RateConstantOptimizerTemplate(ABC):
@@ -100,14 +98,13 @@ class RateConstantOptimizerTemplate(ABC):
 
     @staticmethod
     @abstractmethod
-    def create_prediction(x: np.ndarray, x_description: list[str]) -> tuple[pl.DataFrame, float]:
+    def create_prediction(x: np.ndarray, x_description: list[str]) -> pl.DataFrame:
         """
         Create a prediction of the system, given a set of parameters.
         :param x: Contains all parameters, which are to be optimized.
         Definitely includes are rate constants.
         :param x_description: Contains a description of each parameter.
         :return: Predicted values of the concentration for each chemical, as a function of time.
-                 Predicted ratio of compounds (enantiomeric ratio).
         """
         pass
 
@@ -218,11 +215,11 @@ class RateConstantOptimizerTemplate(ABC):
             """The function is given a set of parameters by the Nelder-Mead algorithm.
             Proceeds to calculate the corresponding prediction and its total error.
             The results are stored in a log before the error is returned to the optimizer."""
-            prediction, predicted_compound_ratio = self.create_prediction(x, x_description)
+            prediction = self.create_prediction(x, x_description)
             errors = self.calculate_error_functions(prediction)
             total_error = self.calculate_total_error(errors)
 
-            logger.log(pd.Series([x, total_error, predicted_compound_ratio], index=["x", "error", "ratio"]))
+            logger.log(pd.Series([x, total_error], index=["x", "error"]))
             return total_error
 
         try:

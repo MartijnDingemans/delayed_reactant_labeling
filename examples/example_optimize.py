@@ -143,7 +143,7 @@ class RateConstantOptimizer(RateConstantOptimizerTemplate):
         return curves
 
     @staticmethod
-    def create_prediction(x: np.ndarray, x_description: list[str]) -> tuple[pl.DataFrame, float]:
+    def create_prediction(x: np.ndarray, x_description: list[str]) -> pl.DataFrame:
         # separate out the ionization factor from the other parameters which are being optimized.
         rate_constants = pd.Series(x[:len(rate_constant_names)], index=x_description[:len(rate_constant_names)])
         ionization_factor = x[-1]
@@ -175,9 +175,7 @@ class RateConstantOptimizer(RateConstantOptimizerTemplate):
                         f"4/5{isomer}{label}")
                 )
 
-        predicted_total_compound = prediction_labeled[COMPOUND_RATIO[1]].sum(axis=1)
-        predicted_compound_ratio = prediction_labeled[COMPOUND_RATIO[0]] / predicted_total_compound
-        return prediction_labeled, predicted_compound_ratio[-100:].mean()
+        return prediction_labeled
 
 
 RCO = RateConstantOptimizer(raw_weights=WEIGHTS, experimental=experimental, metric=METRIC)
@@ -213,7 +211,7 @@ rate_constants_roelant = {
 # define your inputs
 x = np.array(list(rate_constants_roelant.values()) + [0.025])
 x_description = list(rate_constants_roelant.keys()) + ['ion']
-labeled_prediction = RCO.create_prediction(x=x, x_description=x_description)[0]  # prediction
+labeled_prediction = RCO.create_prediction(x=x, x_description=x_description)
 errors = RCO.calculate_error_functions(labeled_prediction)
 weighed_errors = RCO.weigh_errors(errors)
 
@@ -272,8 +270,6 @@ vertex = [
     0.01
 ]
 vertex = np.array(vertex)
-
-
 
 # vertex = constraints['vertex'].to_numpy()
 
