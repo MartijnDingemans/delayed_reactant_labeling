@@ -9,7 +9,7 @@ from icecream import ic
 from src.delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate
 from src.delayed_reactant_labeling.predict_new import DRL
 
-EXPERIMENTAL_DATA_PATH = r'C:\Users\mdingemans\delayed_reactant_labeling\tools\experimental_data\experimental_data_Roelant.xlsx'  # the absolute path can also be given
+EXPERIMENTAL_DATA_PATH = 'experimental_data_Roelant.xlsx'  # the absolute path can also be given
 CONCENTRATIONS_INITIAL = {"cat": 0.005 * 40 / 1200,  # concentration in M
                           "2": 0.005 * 800 / 1200}
 CONCENTRATION_LABELED_REACTANT = {"2'": 0.005 * 800 / 2000}
@@ -273,7 +273,7 @@ vertex = np.array(vertex)
 
 # vertex = constraints['vertex'].to_numpy()
 
-RCO.optimize(path=r'C:\Users\mdingemans\delayed_reactant_labeling\tools\optimize',
+RCO.optimize(path='examples_optimization/example_optimize_singular/',
              x0=vertex,
              bounds=bounds,
              x_description=x_description, maxiter=200,
