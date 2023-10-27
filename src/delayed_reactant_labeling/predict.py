@@ -2,7 +2,6 @@ import numpy as np
 import polars as pl
 import pandas as pd
 from dataclasses import dataclass
-from typing import Optional
 from numba import njit
 from numba.typed import List
 
@@ -94,8 +93,8 @@ class DRL:
             for k, reactants, products in reactions:
                 df.append(pd.Series([k, rate_constants[k], reactants, products],
                                     index=['k', 'k-value', 'reactants', 'products']))
-            self.reactions = pd.DataFrame(df)
-            print(self.reactions)
+            self.reactions_overview = pd.DataFrame(df)
+            print(self.reactions_overview)
 
         # The rate constants that were inputted will be shown if an error occurs. Allows for easier debugging.
         self.rate_constants_input = pd.Series(rate_constants)
@@ -170,7 +169,7 @@ class DRL:
         :param labeled_concentration: The concentration of the labeled chemical. This concentration is not diluted.
         :param dilution_factor: The factor (<1) by which the prediction will be 'diluted' when the labeled chemical is added.
         :param steps_per_step: The number of steps between the returned point in the t_eval array.
-            Higher number increase the accuracy.
+            Higher number increases the accuracy.
         """
         # modify the stored initial concentration to match with input.
         for chemical, initial_concentration in initial_concentrations.items():
