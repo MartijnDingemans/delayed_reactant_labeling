@@ -175,8 +175,8 @@ class DRL:
         return _calculate_jac(y, self.reaction_rate, self.reaction_reactants, self.reaction_products)
 
     def predict_concentration(self,
-                              t_eval_pre,
-                              t_eval_post,
+                              t_eval_pre: np.ndarray,
+                              t_eval_post: np.ndarray,
                               initial_concentrations: dict[str, float],
                               labeled_concentration: dict[str, float],
                               dilution_factor: float,
