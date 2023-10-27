@@ -1,31 +1,24 @@
-import math
-import os
 from copy import deepcopy
 
 import pandas as pd
 import polars as pl  # just much more efficient than pandas, although not as easy to use.
 import numpy as np
-import matplotlib.pyplot as plt
 
-from scipy.optimize import minimize
 from icecream import ic
 
 from delayed_reactant_labeling.predict_new import DRL
 from delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate
 from delayed_reactant_labeling.visualize import VisualizeSingleSolution, VisualizeMultipleSolutions
 
-#%%
 experimental_complete = pl.read_excel("experimental_data_Roelant.xlsx", engine='openpyxl')
 index_labeled_compound = np.argmax(experimental_complete["time (min)"] > 10.15)
 
-time_pre_addition = experimental_complete['time (min)'][:index_labeled_compound]
+time_pre_addition = experimental_complete['time (min)'][:index_labeled_compound].to_numpy()
 
 # only look at the part after the addition of labeled compound
 experimental = experimental_complete[index_labeled_compound:, :]
-time = experimental['time (min)']
+time = experimental['time (min)'].to_numpy()
 
-
-#%%
 WEIGHT_TIME = 1 - 0.9 * np.linspace(0, 1, time.shape[0])  # decrease weight with time, first point 10 times as import as last point
 WEIGHT_TIME = WEIGHT_TIME / sum(WEIGHT_TIME)  # normalize
 
@@ -33,8 +26,6 @@ WEIGHT_TIME = WEIGHT_TIME / sum(WEIGHT_TIME)  # normalize
 def METRIC(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     return np.average(np.abs(y_pred - y_true), weights=WEIGHT_TIME, axis=0)
 
-
-#%%
 
 REACTIONS_ONEWAY = [
     # unlabeled
@@ -89,8 +80,6 @@ def create_reaction_equations():
 reaction_equations = create_reaction_equations()
 rate_constant_names = sorted(set([k for k, _, _ in reaction_equations]))  # extract each unique k value
 
-
-#%%
 COMPOUND_RATIO = ("6D", ["6D", "6E"])  # chemical, compared to chemicals
 
 # Weigh each error. The first element of each tuple is matches against the error string, and the selected errors are subsequently scaled.
@@ -115,15 +104,15 @@ class RateConstantOptimizer(RateConstantOptimizerTemplate):
                   verbose=False)  # stores values in drl.reactions which describe which reactant and products react.
 
         # prediction unlabeled is unused
-        prediction_unlabeled, prediction_labeled = drl.predict_concentration(
+        prediction_unlabeled, prediction_labeled = drl.predict_concentration_euler(
             t_eval_pre=time_pre_addition,
             t_eval_post=time,
             initial_concentrations={"cat": 0.005 * 40 / 1200, "2": 0.005 * 800 / 1200},
             labeled_concentration={"2'": 0.005 * 800 / 2000},
             dilution_factor=1200 / 2000,
-            ivp_method='Radau',
-            dense_output=True,
-            rtol=1e-6,  # relative tolerance, kw in scipy.integrate.solve_ivp
+            # ivp_method='Radau',
+            # dense_output=True,
+            # rtol=1e-6,  # relative tolerance, kw in scipy.integrate.solve_ivp
         )
 
         # SYSTEM-SPECIFIC ENAMINE IONIZATION CORRECTION -> only a prediction of 4/5 can be made!
@@ -162,116 +151,39 @@ class RateConstantOptimizer(RateConstantOptimizerTemplate):
 
 RCO = RateConstantOptimizer(raw_weights=WEIGHTS, experimental=experimental, metric=METRIC)
 
+# define the bounds, and vertex for the nelder-mead optimization
+dimension_descriptions = rate_constant_names + ["ion"]
 
-#%%
-# these rate constants were found by Roelant et al. and are used as a example only
-rate_constants_roelant = {
-    "k1_D": 1.5,
-    "k1_E": 0.25,
-    "k1_F": 0.01,
-    "k2_D": 0.43,
-    "k2_E": 0.638,
-    "k2_F": 0.567,
-    "k3_D": 0.23,
-    "k3_E": 0.35,
-    "k3_F": 0.3,
-    "k4_D": 8,
-    "k4_E": 0.05,
-    "k4_F": 0.03,
-    "k-1_D": 0,
-    "k-1_E": 0,
-    "k-1_F": 0,
-    "k-2_D": 0.025,
-    "k-2_E": 0.035,
-    "k-2_F": 0.03,
-    "k-3_D": 0,
-    "k-3_E": 0,
-    "k-3_F": 0,
-    "k-4_D": 0,
-    "k-4_E": 0,
-    "k-4_F": 0,
-}
+constraints = pd.DataFrame(np.full((3, len(dimension_descriptions)), np.nan), index=["vertex", "lower", "upper"],
+                           columns=dimension_descriptions).T
 
-# define your inputs
-x = np.array(list(rate_constants_roelant.values()) + [0.025])
-x_description = list(rate_constants_roelant.keys()) + ['ion']
+index_reverse_reaction = constraints.index.str.contains("k-")
+constraints[~index_reverse_reaction] = [1, 1e-6, 50]  # forwards; vertex, lb, ub
+constraints[index_reverse_reaction] = [0.5, 0, 50]    # backwards
 
-# create the prediction, calculate the error, and weigh them. This exact procedure will also be followed when optimizing the entire system.
-labeled_prediction = RCO.create_prediction(x=x, x_description=x_description)[0]  # prediction
+# special case
+constraints[constraints.index.str.contains("ion")] = [0.01, 1e-6, 1]
 
-errors = RCO.calculate_error_functions(labeled_prediction)
-weighed_errors = RCO.weigh_errors(errors)
+# either chemically or experimentally determined to be zero
+constraints[constraints.index.str.contains("k-1")] = [0, 0, 0]
+constraints[constraints.index.str.contains("k-3")] = [0, 0, 0]
+constraints[constraints.index.str.contains("k-4")] = [0, 0, 0]
+constraints[constraints.index.str.contains("k2")] = [0, 0, 0]
+vertex = constraints["vertex"].to_numpy()
+bounds = [(lb, ub,) for _, (_, lb, ub) in constraints.iterrows()]
 
-df = pd.DataFrame([errors, weighed_errors], index=["normal", "weighed"]).T
-print(df)
-ic(weighed_errors.sum())
+OPTIMIZE_TYPE = f"example_optimize_singular"  # in which path it should be saved (relative to a main folder)
 
-fig, ax = plt.subplots(tight_layout=True)
-weighed_errors.T.plot.bar(ax=ax)
-ax.set_ylabel("MAE")
+path = f"./optimization/{OPTIMIZE_TYPE}/"
+method_description = OPTIMIZE_TYPE.replace("_", " ")  # will be used as the plot title, defaults to OPTIMIZE_TYPE
 
-
-#%%
-
-fig_label, axs_label = plt.subplots(3, 1, tight_layout=True, figsize=(8, 8), squeeze=False)
-fig_isomer, axs_isomer = plt.subplots(2, 1, tight_layout=True, squeeze=False)
-fig_TIC, axs_TIC = plt.subplots(3, 2, tight_layout=True, figsize=(8, 8), squeeze=False)
-marker_settings = {"alpha": 0.4, "marker": ".", "s": 1}
-
-true = RCO.experimental_curves
-pred = RCO.calculate_curves(labeled_prediction)
-
-for i, intermediate in enumerate(INTERMEDIATES):
-    # sum does not have to be recalculated between the isomer runs
-    sum_all_isomers = labeled_prediction[[intermediate + isomer for isomer in ISOMERS]].sum(axis=1)
-    for j, isomer in enumerate(ISOMERS):
-        # the "iso_" prefix is given to each chemical so that we can search the strings for e.g. "iso_A" and not get a match for label
-        chemical_iso_split = f"int_{intermediate}_iso_{isomer}"
-
-        # plot label ratio
-        axs_label[j, 0].plot(time, pred[f"label_{chemical_iso_split}"], color=f"C{i}",
-                             label=f"{chemical_iso_split} MAE: {errors[f'label_{chemical_iso_split}']:.3f}")
-        axs_label[j, 0].scatter(time, true[f"label_{chemical_iso_split}"], color=f"C{i}", **marker_settings)
-        # the curve of the labeled compound is the same, by definition, as 1 - unlabeled
-        axs_label[j, 0].plot(time, 1 - pred[f"label_{chemical_iso_split}"], color="tab:gray")
-        axs_label[j, 0].scatter(time, 1 - true[f"label_{chemical_iso_split}"], color="tab:gray", **marker_settings)
-
-        # isomer ratio
-        axs_isomer[i, 0].plot(time, pred[f"isomer_{chemical_iso_split}"],
-                              label=f"{chemical_iso_split} MAE: {errors[f'isomer_{chemical_iso_split}']:.3f}")
-        axs_isomer[i, 0].scatter(time, RCO.experimental_curves[f"isomer_{chemical_iso_split}"], **marker_settings)
-
-        # TIC shape
-        axs_TIC[j, i].plot(time, pred[f"TIC_{chemical_iso_split}"],
-                           color="tab:blue",
-                           label=f"{chemical_iso_split} MAE: {errors[f'TIC_{chemical_iso_split}']:.3f}")
-        axs_TIC[j, i].scatter(time, RCO.experimental_curves[f"TIC_{chemical_iso_split}"], color="tab:blue",
-                              **marker_settings)
-
-        axs_TIC[j, i].plot(time, pred[f"TIC_{chemical_iso_split}'"],
-                           color="tab:gray",
-                           label=f"""{chemical_iso_split} MAE: {errors[f"TIC_{chemical_iso_split}'"]:.3f}""")
-        axs_TIC[j, i].scatter(time, RCO.experimental_curves[f"TIC_{chemical_iso_split}'"], color="tab:gray",
-                              **marker_settings)
-
-fig_isomer.supylabel("isomer ratio")
-fig_isomer.supxlabel("time (min)")
-for ax in axs_isomer.flatten():
-    ax.legend()
-fig_isomer.show()
-
-fig_label.supylabel("labeled ratio")
-fig_label.supxlabel("time (min)")
-for ax in axs_label.flatten():
-    ax.legend()
-fig_label.show()
-
-fig_TIC.supylabel("normalized TIC")
-fig_TIC.supxlabel("time (min)")
-for ax in axs_TIC.flatten():
-    ax.legend()
-fig_TIC.show()
-
-
-
-
+optimize=True
+if optimize:
+    RCO.optimize(
+        x0=vertex,
+        x_description=dimension_descriptions,
+        bounds=bounds,
+        path=path,
+        maxiter=200,
+        _overwrite_log=True
+    )
