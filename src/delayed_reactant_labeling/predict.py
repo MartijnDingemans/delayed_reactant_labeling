@@ -75,14 +75,18 @@ class DRL:
     def __init__(self,
                  reactions: list[tuple[str, list[str], list[str]]],
                  rate_constants: dict[str, float] | pd.Series,
-                 verbose=False):
-        """Initialize the chemical system.
+                 output_order: list[str] = None,
+                 verbose: bool = False):
+        """
+        Initialize the chemical system.
         :param reactions: List of reactions, each reaction is given as a tuple.
         Its first element is a string, which determines which rate constant is applicable to that reaction.
         Its second element is a list containing the identifiers (strings) of each reactant in the reaction.
         The third element contains a list for the reaction products
-        :param rate_constants: A dictionairy or which maps the rate constants to their respective values.
-        :param verbose: If True, it will print and store information on which reactions are intialized.
+        :param rate_constants: A dictionary which maps the rate constants to their respective values.
+        :param output_order: Defines in which column the concentration of each chemical will be stored.
+            By default, it is alphabetical.
+        :param verbose: If True, it will print and store information on which reactions are initialized.
         """
         if verbose:
             # Pandas is much more flexible when it comes to storing data. Especially lists in lists.
@@ -90,19 +94,23 @@ class DRL:
             for k, reactants, products in reactions:
                 df.append(pd.Series([k, rate_constants[k], reactants, products],
                                     index=['k', 'k-value', 'reactants', 'products']))
-            self.reactions_overview = pd.DataFrame(df)
-            print(self.reactions_overview)
+            self.reactions = pd.DataFrame(df)
+            print(self.reactions)
 
-        # Acts as a backup in which the rate constants are available in the same format as they were inputted.
+        # The rate constants that were inputted will be shown if an error occurs. Allows for easier debugging.
         self.rate_constants_input = pd.Series(rate_constants)
 
         # link the name of a chemical with an index
-        self.reference = set()
-        for k, reactants, products in reactions:
-            for compound in reactants + products:
-                self.reference.add(compound)
-        self.reference = {compound: n for n, compound in enumerate(sorted(self.reference))}
-        self.initial_concentrations = np.zeros((len(self.reference)))
+        if output_order is None:
+            # default to alphabetical order
+            chemicals = set()
+            for _, reactants, products in reactions:
+                for chemical in reactants + products:
+                    chemicals.add(chemical)
+            output_order = list(sorted(chemicals))
+
+        self.reference = pd.Series(np.arange(len(output_order)), index=output_order)
+        self.initial_concentrations = np.zeros((len(self.reference)))  # default is 0 for each chemical
 
         # construct a list containing the indices of all the reactants and products per reaction
         self.reaction_rate = []  # np array at the end
@@ -148,37 +156,42 @@ class DRL:
         return df_result, predicted_concentration[-1, :]  # last prediction step
 
     def predict_concentration(self,
-                              experimental_conditions: Experimental_Conditions,
-                              steps_per_step: int = 1,
-                              ) -> tuple[pl.DataFrame, pl.DataFrame]:
+                              t_eval_pre,
+                              t_eval_post,
+                              initial_concentrations: dict[str, float],
+                              labeled_concentration: dict[str, float],
+                              dilution_factor: float,
+                              steps_per_step: int = 1):
         """
-        Predicts the concentration of a system, using the appropriate experimental conditions.
-        :param experimental_conditions: Experimental Conditions object.
-        :param steps_per_step: The number of steps to simulate inbetween each step in the time slice.
-        Higher values yield higher accuracy at the cost of computation time.
-        :return (unlabeled prediction, labeled prediction,): Pd.Dataframe of the situation pre-addition of the labeled
-         compound, and one of the post-addition situation.
+        Predicts the concentrations during a DRL experiment.
+        :param t_eval_pre: The time steps that must be evaluated and returned before the addition of the labeled compound.
+        :param t_eval_post:  The time steps that must be evaluated and returned after the addition of the labeled compound.
+        :param initial_concentrations: The initial concentrations of each chemical. Non-zero concentrations are not required.
+        :param labeled_concentration: The concentration of the labeled chemical. This concentration is not diluted.
+        :param dilution_factor: The factor (<1) by which the prediction will be 'diluted' when the labeled chemical is added.
+        :param steps_per_step: The number of steps between the returned point in the t_eval array.
+            Higher number increase the accuracy.
         """
-        # reorder the initial concentrations such that they match with the sorting in self.reference
-        for compound, initial_concentration in experimental_conditions.initial_concentrations.items():
-            self.initial_concentrations[self.reference[compound]] = initial_concentration
+        # modify the stored initial concentration to match with input.
+        for chemical, initial_concentration in initial_concentrations.items():
+            self.initial_concentrations[self.reference[chemical]] = initial_concentration
 
         # pre addition
         result_pre_addition, last_prediction = self._predict_concentration_slice(
             initial_concentration=self.initial_concentrations,
-            time_slice=experimental_conditions.time[0],
+            time_slice=t_eval_pre,
             steps_per_step=steps_per_step
         )
 
-        # dillution step
-        diluted_concentrations = last_prediction * experimental_conditions.dilution_factor
-        for reactant, concentration in experimental_conditions.labeled_reactant.items():
+        # dilution step
+        diluted_concentrations = last_prediction * dilution_factor
+        for reactant, concentration in labeled_concentration.items():
             diluted_concentrations[self.reference[reactant]] = concentration
 
         # post addition
         results_post_addition, _ = self._predict_concentration_slice(
             initial_concentration=diluted_concentrations,
-            time_slice=experimental_conditions.time[1],
+            time_slice=t_eval_post,
             steps_per_step=steps_per_step
         )
 
