@@ -1,14 +1,13 @@
 from copy import deepcopy
 
-import numpy as np
-import polars as pl
-import pandas as pd
 import matplotlib.pyplot as plt
-
+import numpy as np
+import pandas as pd
+import polars as pl
 from icecream import ic
-from src.delayed_reactant_labeling.predict_new import DRL
-from src.delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate
 
+from src.delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate
+from src.delayed_reactant_labeling.predict_new import DRL
 
 EXPERIMENTAL_DATA_PATH = r'C:\Users\mdingemans\delayed_reactant_labeling\tools\experimental_data\experimental_data_Roelant.xlsx'  # the absolute path can also be given
 CONCENTRATIONS_INITIAL = {"cat": 0.005 * 40 / 1200,  # concentration in M
@@ -164,8 +163,8 @@ class RateConstantOptimizer(RateConstantOptimizerTemplate):
             initial_concentrations=CONCENTRATIONS_INITIAL,
             labeled_concentration=CONCENTRATION_LABELED_REACTANT,
             dilution_factor=DILUTION_FACTOR,
-            rtol=1e-10,
-            atol=1e-10,
+            rtol=1e-8,
+            atol=1e-8,
         )
 
         # SYSTEM-SPECIFIC ENAMINE IONIZATION CORRECTION -> only a prediction of 4/5 can be made!
@@ -182,7 +181,6 @@ class RateConstantOptimizer(RateConstantOptimizerTemplate):
 
 
 RCO = RateConstantOptimizer(raw_weights=WEIGHTS, experimental=experimental, metric=METRIC)
-
 
 # these rate constants were found by Roelant et al. and are used as a example only
 rate_constants_roelant = {
@@ -223,7 +221,6 @@ df = pd.DataFrame([errors, weighed_errors], index=["normal", "weighed"]).T
 print(df)
 ic(weighed_errors.sum())
 
-
 # the rate constant optimizer class is independent of your predicted run.
 x_description = rate_constant_names + ['ion']
 constraints = pd.DataFrame(np.full((3, len(x_description)), np.nan), index=["vertex", "lower", "upper"],
@@ -246,7 +243,7 @@ constraints[constraints.index.str.contains("k-3")] = [0, 0, 0]
 constraints[constraints.index.str.contains("k-4")] = [0, 0, 0]
 bounds = [(lb, ub,) for _, (_, lb, ub) in constraints.iterrows()]
 
-'''
+
 vertex = [
     0.000000,
     0.000000,
@@ -275,9 +272,10 @@ vertex = [
     0.01
 ]
 vertex = np.array(vertex)
-'''
 
-vertex = constraints['vertex'].to_numpy()
+
+
+# vertex = constraints['vertex'].to_numpy()
 
 RCO.optimize(path=r'C:\Users\mdingemans\delayed_reactant_labeling\tools\optimize',
              x0=vertex,
@@ -285,3 +283,28 @@ RCO.optimize(path=r'C:\Users\mdingemans\delayed_reactant_labeling\tools\optimize
              x_description=x_description, maxiter=200,
              _overwrite_log=True)
 
+fig, axs = plt.subplots(3, 1, tight_layout=True, figsize=(8, 8), squeeze=False)
+
+true_curves = RCO.experimental_curves
+pred_curves = RCO.calculate_curves(labeled_prediction)
+
+for i, intermediate in enumerate(INTERMEDIATES):
+    for j, isomer in enumerate(ISOMERS):
+        chemical_iso_split = f"int_{intermediate}_iso_{isomer}"
+
+        # plot label ratio
+        axs[j, 0].plot(time, pred_curves[f"label_{chemical_iso_split}"], color=f"C{i}",
+                       label=f"{chemical_iso_split} MAE: {errors[f'label_{chemical_iso_split}']:.3f}")
+        axs[j, 0].scatter(time, true_curves[f"label_{chemical_iso_split}"],
+                          color=f"C{i}", alpha=0.4, marker=".", s=1)
+
+        # the curve of the labeled compound is the same, by definition, as 1 - unlabeled
+        axs[j, 0].plot(time, 1 - pred_curves[f"label_{chemical_iso_split}"], color="tab:gray")
+        axs[j, 0].scatter(time, 1 - true_curves[f"label_{chemical_iso_split}"], color="tab:gray", alpha=0.4, marker=".", s=1)
+
+
+fig.supylabel("labeled ratio")
+fig.supxlabel("time (min)")
+for ax in axs.flatten():
+    ax.legend()
+fig.show()

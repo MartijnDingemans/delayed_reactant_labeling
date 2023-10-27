@@ -1,66 +1,91 @@
 Predict
 =======
 The predict module implements the :class:`DRL <predict.DRL>` class which helps to create a prediction of a chemical
-system. When the prediction fails it raises a :exc:`InvalidPredictionError <predict.InvalidPredictionError>`. The prediction requires the class
-:class:`experimental data <predict.Experimental_Conditions>` to contain all relevant data.
+system. When the prediction fails it raises a :exc:`InvalidPredictionError <predict.InvalidPredictionError>`. The DRL
+class implements methods to:
 
+#. :meth:`Predict the concentrations<predict.DRL.predict_concentration>` for a DRL experiment using the ODE solver (preferred).
+#. Calculate the :ref:`change<rate_equations>`  in chemical concentration as a function of the current concentrations.
+#. Calculate the :ref:`Jacobian matrix<Jacobian>` , which is required by the ODE solver. This **only** works for reaction where each reaction step is first order in each chemical.
+#. Predict the concentrations for a DRL experiment using the explicit Euler formula (discouraged).
 
 .. py:currentmodule:: predict
-.. class:: DRL(reactions, rate_constants, verbose=False)
-
-    Upon creation of the DRL class object, it will convert the reaction equations to their respective rate equations.
-    When the model is given a set of initial concentrations, the rate equations can used to predict the concentration of
-    the system for the next time stamp (explicit Euler formula).
+.. class:: DRL(reactions, rate_constants, output_order=None, verbose=False)
 
     :param reactions: The reactions that describe the system. Each tuple exist out of the name of the rate constant,
         a list of reactants, and a list of products.
     :type reactions: list[tuple[str, list[str], list[str]]]
     :param rate_constants: A dictionary which maps the rate constants to their respective values.
     :type rate_constants: dict[str: float]
+    :param output_order: Defines in which column the concentration of each chemical will be stored.
+            By default, it is alphabetical.
+    :type output_order: list[str]
     :param verbose: If True, it will print and store information on which reactions are initialized.
     :type verbose: bool
-
 
     :ivar reactions_overview: A comprehensive overview of the reactions that will be calculated
         if the verbose argument was True upon initialization.
 
-    .. method:: predict_concentration(experimental_conditions, steps_per_step=1)
+    .. method:: predict_concentration(t_eval_pre, t_eval_post, initial_concentrations, labeled_concentrations, dilution_factor, atol=1e-10, rtol=1e-10)
 
-        Calls self._predict_concentration_slice to predict both the time before the addition, as the situation after the
-        addition of the labeled compound. Inbetween the two prediction the concentration will be diluted according to
-        the dilution factor, and the labeled chemical will be introduced in the system.
+        Predicts the concentrations during a DRL experiment. After evaluating all timestamp in t_eval_pre it 'dilutes'
+        the prediction and sets the concentration of labeled compound. Subsequently the t_eval_post time stamps are
+        evaluated. It utilizes the ODE solver 'scipy.integrate.solve_ivp' with the Radau method. Negative concentrations
+        might occur within the range of the tolerances given.
 
-        :param experimental_conditions: The experimental conditions for which the prediction should be made.
-        :type experimental_conditions: :class:`Experimental_Conditions`
-        :param steps_per_step: The number of steps inbetween each step in the experimental_conditions.time array.
-        :type steps_per_step: int
-        :raise InvalidPredictionError: If negative concentration, or NaN values, are detected in the output.
+        :param t_eval_pre: The time steps that must be evaluated and returned before the addition of the labeled compound.
+        :param t_eval_post:  The time steps that must be evaluated and returned after the addition of the labeled compound.
+        :param initial_concentrations: The initial concentrations of each chemical. Non-zero concentrations are not required.
+        :param labeled_concentration: The concentration of the labeled chemical. Non-zero concentrations are not required. This concentration is not diluted.
+        :param dilution_factor: The factor (≤1) by which the prediction will be multiplied when the labeled chemical is added.
+            This simulates the dilution upon addition of solvent.
+        :param atol: The absolute tolerances for the ODE solver.
+        :param rtol: The relative tolerances for the ODE solver.
+
+        :type t_eval_pre: np.ndarray
+        :type t_eval_post:  np.ndarray
+        :type initial_concentrations: dict[str: float]
+        :type labeled_concentration: dict[str: float]
+        :type dilution_factor: float
+        :type atol: float
+        :type rtol: float
+
+        :raise InvalidPredictionError: If negative concentration larger than the maximum tolerance, or NaN values, are detected in the output.
         :return: Predictions of the concentrations pre-, and post-addition of the labeled compound.
-            The chemicals might be in ordered in a different position.
+        :rtype: tuple[polars.DataFrame, polars.DataFrame]
+
+    .. method:: predict_concentration_Euler(experimental_conditions, steps_per_step=1)
+
+        Predicts the concentrations during a DRL experiment. After evaluating all timestamp in t_eval_pre it 'dilutes'
+        the prediction and sets the concentration of labeled compound. Subsequently the t_eval_post time stamps are
+        evaluated. It implements the explicit Euler formula. More steps in between each evaluated point in the t_eval
+        arrays can be added to increase the accuracy.
+
+        :param t_eval_pre: The time steps that must be evaluated and returned before the addition of the labeled compound.
+        :param t_eval_post:  The time steps that must be evaluated and returned after the addition of the labeled compound.
+        :param initial_concentrations: The initial concentrations of each chemical. Non-zero concentrations are not required.
+        :param labeled_concentration: The concentration of the labeled chemical. Non-zero concentrations are not required. This concentration is not diluted.
+        :param dilution_factor: The factor (≤1) by which the prediction will be multiplied when the labeled chemical is added.
+            This simulates the dilution upon addition of solvent.
+        :param steps_per_step: The number of steps to simulate per step of the t_eval array. Higher values yield higher
+            accuracy at the cost of computation time.
+
+        :type t_eval_pre: np.ndarray
+        :type t_eval_post:  np.ndarray
+        :type initial_concentrations: dict[str: float]
+        :type labeled_concentration: dict[str: float]
+        :type dilution_factor: float
+        :type steps_per_step: int
+
+        :raise InvalidPredictionError: If negative concentration larger than the maximum tolerance, or NaN values, are detected in the output.
+        :return: Predictions of the concentrations pre-, and post-addition of the labeled compound.
         :rtype: tuple[polars.DataFrame, polars.DataFrame]
 
 
 .. exception:: InvalidPredictionError
 
-    Raised if negative or NaN values are detected in the output of the prediction. Negative values can occur, when a the
-    rate constant multiplied with the delta time and the concentration of reactants becomes larger than the concentration
-    of the reactant. By decreasing the delta time, we can prevent this from happening. One convenient way of doing this
-    is by increasing the ``steps_per_step`` of the measured data points.
-
+    Raised when NaN values or values more negative than the tolerance are found.
     For debugging purposes the error also contains the rate constants which were used when the error occurred.
-
-
-.. class:: Experimental_Conditions(time, initial_concentrations, dilution_factor, labeled_reactant)
-
-    Stores basic information required for a prediction.
-
-    :param time: The time points at which a mass spectrum was measured, for both the unlabeled and the labeled sections.
-    :type time: tuple[np.ndarray, np.ndarray]
-    :param initial_concentrations: The initial concentrations for each chemical. Only non-zero values must be given.
-    :type initial_concentrations: dict[str, float]
-    :param dilution_factor: The factor (< 1) by which all concentration will be multiplied upon the addition of the labeled reactant.
-    :type dilution_factor: float
-    :param labeled_reactant: The initial concentration for the labeled reactant. This will **not** be diluted.
 
 
 example
@@ -92,29 +117,19 @@ Lets assume that we know the rate constants belonging to this reaction.
         "k2": 0.5,
     }
 
-To create the relevant prediction for this model we need to collect the
-:class:`experimental data <predict.Experimental_Conditions>` in a class. Some of the input variables contain non-sensible
-information, this is because we currently do not want to model a complete DRL experiment, but only the simple beginning.
-After this is done, the prediction can be made using :func:`DRL.predict_concentration`.
+We can create a prediction using the :func:`DRL.predict_concentration`. The class implements the method which determines
+the rate of change as a function of its current state, and a method which calculate the Jacobian based on its state.
+Because we do not want to model an entire DRL experiment, ``solve_ivp`` is used instead of :func:`DRL.predict_concentration`.
+Internally, the function calls ``solve_ivp``.
 
 .. code-block:: python
 
     import numpy as np
-    from delayed_reactant_labeling.predict import DRL, Experimental_Conditions
+    from scipy.integrate import solve_ivp
+    from delayed_reactant_labeling.predict import DRL
 
-    time_pre_addition = np.linspace(0, 20, 2000)  # 0 to 10 minutes, 2000 datapoints
-    time_post_addition = np.linspace(0, 1, 10)    # filled with a useable time array, but we will ignore these results
-    A0 = 1
-
-    experimental_conditions = Experimental_Conditions(
-        time=(time_pre_addition, time_post_addition,),
-        initial_concentrations={'A': A0},
-        dilution_factor=1,                  # we do not model DRL here
-        labeled_reactant={}                 # we do not model DRL here
-    )
-
-    drl = DRL(rate_constants=rate_constants, reactions=reactions, verbose=False)
-    pred, _ = drl.predict_concentration(experimental_conditions=experimental_conditions)
+    drl = DRL(rate_constants=rate_constants, reactions=reactions, output_order=['A', 'B', 'C'], verbose=False)
+    result = solve_ivp(drl.calculate_step, t_span=[0, 20], y0=[A0, 0, 0], method='Radau', t_eval=time, jac=drl.calculate_jac)
 
 However, also algebraic `solutions <https://chem.libretexts.org/Bookshelves/Physical_and_Theoretical_Chemistry_Textbook_Maps/Mathematical_Methods_in_Chemistry_(Levitus)/04%3A_First_Order_Ordinary_Differential_Equations/4.03%3A_Chemical_Kinetics>`_
 for this specific chemical problem exist.
@@ -145,12 +160,9 @@ We can compare the algebraic solution to the modelled prediction as follows.
     ax.plot(time, pred['B'] / A0, label='B')
     ax.plot(time, pred['C'] / A0, label='C')
 
-    ax.plot(time, A0 * np.exp(-k1 * time),
-        color='k', linestyle=':', label='algebraic')
-    ax.plot(time, k1 / (k2 - k1) * A0 * (np.exp(-k1 * time) - np.exp(-k2 * time)),
-        color='k', linestyle=':')
-    ax.plot(time, A0 * (1 - np.exp(-k1 * time) - k1 / (k2 - k1) * (np.exp(-k1 * time) - np.exp(-k2 * time))),
-        color='k', linestyle=':')
+    ax.plot(time, A0 * np.exp(-k1 * time), color='k', linestyle=':', label='algebraic')
+    ax.plot(time, k1 / (k2 - k1) * A0 * (np.exp(-k1 * time) - np.exp(-k2 * time)), color='k', linestyle=':')
+    ax.plot(time, A0 * (1 - np.exp(-k1 * time) - k1 / (k2 - k1) * (np.exp(-k1 * time) - np.exp(-k2 * time))), color='k', linestyle=':')
     ax.legend()
     fig.show()
 

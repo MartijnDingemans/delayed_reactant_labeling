@@ -1,7 +1,48 @@
-Design Choices
-==============
+Implementation details
+======================
 For both the predict and optimize modules it was essential to make the code as efficient as possible, while remaining
 robust.
+
+Rate equations
+--------------
+To be able to calculate the rate of change per chemical as a function of the current concentrations in the system,
+the :class:`predict.DRL` class analyzes the reactions. The rate equation of each chemical can be decomposed into the
+rate equations caused by each reaction step in the system. These reaction steps are what the user inputs into the model.
+
+.. math::
+
+    \frac{dc}{dt} = \sum_{r}{ \frac{dc_r}{dt} }
+
+For each reaction we can calculate the amount of created chemical:
+
+.. math::
+
+    dc_r = k_r \cdot \prod{[reactants_r]}
+
+where, k is the rate constant for reaction r. We can subtract this amount of created chemical from each reactant, and
+add it to each product to get the rate of change.
+
+Estimating the Jacobian
+-----------------------
+The Jacobian matrix is a matrix containing the partial derivatives of the rate equations with respect to each chemical.
+Similarly to how we analyzed the rate equations we can again decompose the entire model into individual reaction steps:
+
+.. math::
+
+    J_{i, j} =  \frac{di}{dj} = \sum_{r}{\frac{di_r}{dj}}
+
+For each reaction we than calculate the derivative with respect to each reactant. This is because the rate equation
+due to this reaction is by definition the rate constant multiplied by the concentration of each reaction, and the derivative
+with respect to non-reactants is zero. To calculate the derivative we than take the product of the concentrations of all
+reactants, except the reactants whose derivative we take.
+
+.. math::
+
+    \frac{di_r}{dj} = k_r \cdot \prod^{p=reactants_r}_{p \ne j}{[p]}
+
+Subsequently we multiply this with the rate constant, k, and add this to all reaction products, whereas
+we subtract it from each reactant. Because we take a very simple approach to calculating the derivative, this method
+does not work for reactions where a reactant is present multiple times.
 
 DataFrame Libraries
 -------------------
@@ -10,31 +51,14 @@ turned out to be alot more efficient to calculate the DRL curves and errors with
 convenient to print, and manipulate, as they behave more like dictionaries. Furthermore pandas objects give more
 flexibility to store the data as JSON files. This is why two different dataframe libraries are used simultaneously.
 
+.. _rate_equations:
 
-Predicting Concentrations
--------------------------
-Upon initialization of the :class:`predict.DRL` class, it analyzes the reaction which were inputted, and per reaction
-it extracts the following data:
+Explict Euler formula
+---------------------
+The explicit Euler formula takes the rate of changes as calculated above, and adds it to the currently known concentrations.
+It repeats this the number of ``steps_per_step`` times, and discards the intermediate results. The last
+array of predicted concentration is saved at the corresponding time stamp.
 
-#. The value of the rate constant
-#. The indices of each reactant
-#. The indices of each product
+This method does not work well in stiff problems and using an ODE solver is recommended.
 
-The indices are related to their alphabetical order, and upon calling the :func:`predict.DRL.predict_concentration` it
-rearranges the inputted concentration data to match with the internal reference. It does this by looking at the keys
-of each concentration, so that misalignment cannot happen. However, as a consequence, the outputted data is sorted
-in the same manner as the internal reference, and not according to the input of the initial concentration!
-
-To calculate the predicted concentration at each time stamp the class implements the explicit Euler method, as it is a
-straightforward algorithm to implement. To calculate the concentration for the next time stamp it loops over all reactions,
-and per reaction:
-
-#. It calculates the amount of created chemicals, according to :math:`\Delta t \cdot k \cdot \prod [reactants]`
-#. Subtract the created amount from each reaction reactant.
-#. Add the created amount to each reaction product.
-
-Its important to note that changes are made to a copy of the concentrations array, so that the reactions all act on the
-same data. We repeat this process the number of ``steps_per_step`` times, and discard the intermediate results. The last
-array of predicted concentration is saved at the corresponding time stamp. Furthermore this function which calcules the
-explicit Euler formula is just in time compiled using numba, allowing it to gain a large performance boost.
-
+.. _Jacobian:
