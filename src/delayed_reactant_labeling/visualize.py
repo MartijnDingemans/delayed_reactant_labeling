@@ -367,13 +367,13 @@ class VisualizeMultipleSolutions:
         self.complete_initial_X = []
         self.complete_optimal_X = []
         self.complete_found_error = []
-        self.complete_found_ee = []
+        # self.complete_found_ee = []
 
         for n, guess in tqdm(enumerate(guess_files)):
-            if n>max_guess:
+            if n > max_guess:
                 break
 
-            guess_path = f"{path}{guess}"
+            guess_path = f"{path}/{guess}"
             progress = OptimizerProgress(guess_path)
 
             self.complete_all_X.append(progress.all_X)
