@@ -24,25 +24,26 @@ add it to each product to get the rate of change.
 
 Estimating the Jacobian
 -----------------------
-The Jacobian matrix is a matrix containing the partial derivatives of the rate equations with respect to each chemical.
-Similarly to how we analyzed the rate equations we can again decompose the entire model into individual reaction steps:
+The Jacobian matrix is a matrix containing the partial derivatives of the rate equations of chemical :math:`i` with
+respect to each chemical :math:`j`. Similarly to how we analyzed the rate equations we can again decompose the entire
+model into individual reaction steps:
 
 .. math::
 
     J_{i, j} =  \frac{di}{dj} = \sum_{r}{\frac{di_r}{dj}}
 
 For each reaction we than calculate the derivative with respect to each reactant. This is because the rate equation
-due to this reaction is by definition the rate constant multiplied by the concentration of each reaction, and the derivative
+due to this reaction is by definition the rate constant multiplied by the concentration of each reactant, and the derivative
 with respect to non-reactants is zero. To calculate the derivative we than take the product of the concentrations of all
-reactants, except the reactants whose derivative we take.
+reactants, :math:`p`, except the reactant whose derivative we take.
 
 .. math::
 
-    \frac{di_r}{dj} = k_r \cdot \prod^{p=reactants_r}_{p \ne j}{[p]}
+    \frac{di_r}{dj} = k_r \cdot \prod^{p}_{p \ne j}{[p]}
 
-Subsequently we multiply this with the rate constant, k, and add this to all reaction products, whereas
-we subtract it from each reactant. Because we take a very simple approach to calculating the derivative, this method
-does not work for reactions where a reactant is present multiple times.
+Subsequently we multiply this with the rate constant, :math:`k`, and add this to all reaction products, whereas
+we subtract it from each reactant. Because we take a very simple approach to calculating the derivative, this method only
+works for reaction steps which are first order in each chemical.
 
 DataFrame Libraries
 -------------------
