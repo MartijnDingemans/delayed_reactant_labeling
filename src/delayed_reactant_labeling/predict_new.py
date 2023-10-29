@@ -181,7 +181,7 @@ class DRL:
                               labeled_concentration: dict[str, float],
                               dilution_factor: float,
                               atol: float = 1e-10,
-                              rtol: float = 1e-10):
+                              rtol: float = 1e-10) -> tuple[pl.DataFrame, pl.DataFrame]:
         """
         Predicts the concentrations during a DRL experiment.
         It utilizes the ODE solver 'scipy.integrate.solve_ivp' with the Radau method.
