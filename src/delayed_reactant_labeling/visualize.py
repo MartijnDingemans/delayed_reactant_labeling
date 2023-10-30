@@ -14,7 +14,7 @@ class VisualizeSingleSolution:
                  path: str,
                  description: str,
                  rate_constant_optimizer: RateConstantOptimizerTemplate,
-                 index_constant_values: Optional[np.ndarray],
+                 index_constant_values: Optional[np.ndarray] = None,
                  isomers: Optional[list[str]] = None,
                  dpi: int = 600,
                  ):
@@ -33,18 +33,29 @@ class VisualizeSingleSolution:
             # recompute the best prediction so that we can make plots of it.
             # self.experimental, self._prediction = self.create_prediction(_rate_constants=self.progress.best_rates)
             self._best_prediction = self.rate_constant_optimizer.create_prediction(
-                x=self.progress.best_X.to_numpy(), x_description=self.progress.x_description)[0]
+                x=self.progress.best_X.to_numpy(), x_description=self.progress.x_description)
         return self._best_prediction
 
-    def show_error_over_time(self) -> tuple[plt.Figure, plt.Axes]:
-        """Shows the enantiomeric ratio, and MAE, as a function of the iteration number."""
+    def show_error_over_time(self, compound_ratio: Optional[list[str]] = None, compound_ratio_points: int = 100) -> \
+            tuple[plt.Figure, plt.Axes]:
+        """Shows the enantiomeric ratio if compound_ratio is given, and MAE, as a function of the iteration number.
+        The compound ratio must be redetermined for each point in the compound_ratio_points"""
         # explore the solution
         fig, ax = plt.subplots()
         ax.scatter(range(1, 1 + len(self.progress.all_errors)), self.progress.all_errors, alpha=0.3)
 
-        ax2 = ax.twinx()
-        ax2.scatter(range(1, 1 + len(self.progress.all_ratios)), self.progress.all_ratios, alpha=0.3, color="C1")
-        ax2.set_ylabel("ratio", color="C1")
+        if compound_ratio is not None:
+            ax2 = ax.twinx()
+            found_ratio = []
+            ratio_sampled = np.linspace(0, len(self.progress.all_X) - 1, compound_ratio_points).round(0).astype(int)
+            for iteration in ratio_sampled:
+                pred = self.rate_constant_optimizer.create_prediction(
+                    x=self.progress.all_X.iloc[iteration, :],
+                    x_description=self.progress.all_X.columns)
+                found_ratio.append((pred[compound_ratio[0]] / pred[compound_ratio[1]].sum(axis=1))[-100:].mean())
+
+            ax2.scatter(ratio_sampled, found_ratio, alpha=0.3, color="C1")
+            ax2.set_ylabel("ratio", color="C1")
 
         ax.set_xlabel("iteration")
         ax.set_ylabel("sum of MAE", color="C0")
