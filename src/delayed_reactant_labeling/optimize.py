@@ -135,7 +135,7 @@ class RateConstantOptimizerTemplate(ABC):
             error[curve_description] = self.metric(
                 y_true=self.experimental_curves[curve_description],
                 y_pred=curve_prediction)
-            if np.isnan(error[curve_description])
+            if np.isnan(error[curve_description]):
                 nan_warnings.append(f"The error function for {curve_description} is NaN.")
         if nan_warnings:
             raise ValueError("\n".join(nan_warnings))
