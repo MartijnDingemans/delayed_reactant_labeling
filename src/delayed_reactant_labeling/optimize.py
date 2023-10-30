@@ -89,12 +89,12 @@ class RateConstantOptimizerTemplate(ABC):
         self.metric = metric
 
         # check if any of the curves are potentially problematic
-        errors = []  #
+        nan_warnings = []  #
         for curve_description, curve in self.experimental_curves.items():
             if curve.is_nan().any():
-                errors.append(f"Experimental data curve for {curve_description} contains {curve.is_nan()} NaN values.")
-        if errors:
-            raise ValueError("\n".join(errors))
+                nan_warnings.append(f"Experimental data curve for {curve_description} contains {curve.is_nan().sum()} NaN values.")
+        if nan_warnings:
+            warnings.warn("\n".join(nan_warnings))
 
     @staticmethod
     @abstractmethod

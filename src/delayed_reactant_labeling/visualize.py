@@ -360,14 +360,15 @@ class VisualizeSingleSolution:
 
 
 class VisualizeMultipleSolutions:
-    def __init__(self, path, max_guess):
+    def __init__(self, path, max_guess=np.inf):
+        """Loads the data in the path. For each """
         guess_files = os.listdir(path)
 
         self.complete_all_X = []
         self.complete_initial_X = []
         self.complete_optimal_X = []
         self.complete_found_error = []
-        # self.complete_found_ee = []
+        self.x_description = None
 
         for n, guess in tqdm(enumerate(guess_files)):
             if n > max_guess:
@@ -380,16 +381,41 @@ class VisualizeMultipleSolutions:
             self.complete_initial_X.append(progress.all_X.iloc[0, :])
             self.complete_optimal_X.append(progress.best_X)
             self.complete_found_error.append(progress.best_error)
-            self.complete_found_ee.append(progress.best_ratio)
 
-    def show_summary_all_runs(self, top_n: int) -> tuple[plt.Figure, plt.Axes]:
+            if self.x_description is None:
+                self.x_description = progress.x_description
+
+        # complete all X is not here as it is already a 2D matrix
+        self.complete_initial_X = np.array(self.complete_initial_X)
+        self.complete_optimal_X = np.array(self.complete_optimal_X)
+        self.complete_found_error = np.array(self.complete_found_error)
+
+    def show_error_all_runs(self, top_n=-1) -> tuple[plt.Figure, plt.Axes]:
+        if top_n == -1:
+            top_n = len(self.complete_found_error)
+        ind = np.argsort(self.complete_found_error)[:top_n]
+
+        fig, ax = plt.subplots(layout='tight')
+        ax.scatter(np.arange(top_n), self.complete_found_error[ind])
+        ax.set_xlabel('run number (sorted by error)')
+        ax.set_ylabel('error')
+        return fig, ax
+
+    def show_summary_all_runs(self,
+                              rco: RateConstantOptimizerTemplate,
+                              compound_ratio: list[str, list[str]],
+                              top_n: int = -1,
+                              max_error: float = 0.5) -> tuple[plt.Figure, plt.Axes]:
         fig, ax = plt.subplots(layout='tight')
         ind = np.argsort(self.complete_found_error)[:top_n]
-        found_ratio = np.array(self.complete_found_ee)
+
+        found_ratio = []
+        for run_index in ind:
+            pred = rco.create_prediction(self.complete_optimal_X[run_index].values, self.complete_optimal_X[run_index].index)
+            found_ratio.append(pred[compound_ratio[0]] / pred[compound_ratio[1]].sum(axis=1))  # TODO double check this
 
         error = np.array(self.complete_found_error)
-        error[error > 0.5] = 0.5
-
+        error[error > max_error] = max_error
         im = ax.scatter(np.arange(len(ind)),
                         found_ratio[ind],
                         c=np.array(self.complete_found_error)[ind])
@@ -399,15 +425,16 @@ class VisualizeMultipleSolutions:
         ax.set_ylabel('ratio')
         return fig, ax
 
-    def show_rate_constants(self, max_error: float, index_constant_values: np.ndarray) -> tuple[plt.Figure, plt.Axes]:
+    def show_rate_constants(self, max_error: float, index_constant_values: np.ndarray = None) -> tuple[plt.Figure, plt.Axes]:
         ind_allowed_error = np.array(self.complete_found_error) < max_error
-        df = pd.DataFrame(np.array(self.complete_optimal_X)[ind_allowed_error], columns=self.complete_optimal_X[0].index).loc[:, ~index_constant_values]
+        df = pd.DataFrame(np.array(self.complete_optimal_X)[ind_allowed_error], columns=self.x_description)
+        if index_constant_values is not None:
+            df = df.loc[:, ~index_constant_values]
 
         fig, ax = plt.subplots(layout="tight")
         ax.boxplot(df)
         ax.set_title("distribution of optimal rates")
         _ = ax.set_xticks(1 + np.arange(len(df.columns)), df.columns, rotation=90)
-        ax.set_ylim(0.5e-6, 0.9e2)
         ax.set_yscale("log")
         ax.set_ylabel("value of k")
         return fig, ax
