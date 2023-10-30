@@ -129,12 +129,16 @@ class RateConstantOptimizerTemplate(ABC):
         """
         curves_predicted = self.calculate_curves(prediction)
         error = {}
+        nan_warnings = []
         for curve_description, curve_prediction in curves_predicted.items():
             # noinspection PyArgumentList
             error[curve_description] = self.metric(
                 y_true=self.experimental_curves[curve_description],
                 y_pred=curve_prediction)
-
+            if np.isnan(error[curve_description])
+                nan_warnings.append(f"The error function for {curve_description} is NaN.")
+        if nan_warnings:
+            raise ValueError("\n".join(nan_warnings))
         return pd.Series(error)
 
     def weigh_errors(self, errors: pd.Series, ) -> pd.Series:

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "delayed-reactant-labeling"
-version = "0.2.5"
+version = "0.2.8"
 authors = [
     {name="Martijn Dingemans", email="Martijn.Dingemans@ru.nl"},
     {name="Matthijs Hellinghuizen", email="matthijs.hellinghuizen@ru.nl"}
