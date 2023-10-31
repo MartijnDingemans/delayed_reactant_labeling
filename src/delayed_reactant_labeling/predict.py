@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import polars as pl
+
 from numba import njit
 from numba.typed import List
 from scipy.integrate import solve_ivp
@@ -29,7 +29,7 @@ def _calculate_steps_euler(reaction_rate: np.ndarray,
     :param reaction_products: Each element contains an array of the indices of which chemicals are the products.
     :param concentration: The initial concentrations of each chemical.
     :param time_slice: The points in time that must be examined.
-    :param steps_per_step: The number of simulations which are examined, for each point in the time slice.
+    :param steps_per_step: The number of simulations which are examined for each point in the time slice.
     :return: The predicted concentrations.
     """
     prediction = np.empty((time_slice.shape[0], concentration.shape[0]))
@@ -165,15 +165,20 @@ class DRL:
             self.reaction_products.append(np.array([self.reference[product] for product in products]))
         self.reaction_rate = np.array(self.reaction_rate)
 
-    def calculate_step(self, t, y):
+    def calculate_step(self, _, y):
         """
         Wrapper around dc_dt() to fix the arguments.
-        :param t: Time
+        :param _: Time is inputted here by scipy.integrate.
         :param y: Concentrations
         """
         return dc_dt(y, self.reaction_rate, self.reaction_reactants, self.reaction_products)
 
-    def calculate_jac(self, t, y):
+    def calculate_jac(self, _, y):
+        """
+        Wrapper around dc_dt() to fix the arguments.
+        :param _: Time is inputted here by scipy.integrate.
+        :param y: Concentrations
+        """
         return _calculate_jac(y, self.reaction_rate, self.reaction_reactants, self.reaction_products)
 
     def predict_concentration(self,
@@ -183,7 +188,7 @@ class DRL:
                               labeled_concentration: dict[str, float],
                               dilution_factor: float,
                               atol: float = 1e-10,
-                              rtol: float = 1e-10) -> tuple[pl.DataFrame, pl.DataFrame]:
+                              rtol: float = 1e-10) -> pd.DataFrame:
         """
         Predicts the concentrations during a DRL experiment.
         It utilizes the ODE solver 'scipy.integrate.solve_ivp' with the Radau method.
@@ -199,19 +204,14 @@ class DRL:
         for chemical, initial_concentration in initial_concentrations.items():
             self.initial_concentrations[self.reference[chemical]] = initial_concentration
 
-        jac_sparsity = None # self.calculate_jac(None, np.ones(self.initial_concentrations.shape))
-
         result_pre = solve_ivp(self.calculate_step,
                                t_span=[t_eval_pre[0], t_eval_pre[-1]],
                                t_eval=t_eval_pre,
                                y0=self.initial_concentrations,
                                jac=self.calculate_jac,
                                method='Radau',
-                               jac_sparsity=jac_sparsity,
                                atol=atol,
                                rtol=rtol)
-        df_result_pre = pl.DataFrame(result_pre.y, list(self.reference.keys()))
-        df_result_pre = df_result_pre.with_columns(pl.Series(name='time', values=result_pre.t))
 
         # dilution step
         diluted_concentrations = result_pre.y[:, -1] * dilution_factor  # result.y is transposed
@@ -225,29 +225,27 @@ class DRL:
                                 y0=diluted_concentrations,
                                 method='Radau',
                                 jac=self.calculate_jac,
-                                jac_sparsity=jac_sparsity,
                                 atol=atol,
                                 rtol=rtol)
-        df_result_post = pl.DataFrame(result_post.y, list(self.reference.keys()))
-        df_result_post = df_result_post.with_columns(pl.Series(name='time', values=result_post.t))
+        df_result_post = pd.DataFrame(result_post.y.T, columns=list(self.reference.keys()))
+        df_result_post['time'] = result_post.t
 
         # validate the results
         if result_post.y.min() < -max([atol, rtol]):  # errors up to the given tolerance are allowed.
             raise InvalidPredictionError(
                 f"Negative concentrations (min: {result_post.y.min():6e}) were detected. "
                 f"The applied rate constants are:\n {self.rate_constants_input.to_json()}")
-        if np.isnan(df_result_post.tail(1)).any():
+        if df_result_post.tail(1).isna().values.any():
             raise InvalidPredictionError(
-                f"NaN values (count: {np.isnan(df_result_post.to_numpy).sum()}) were detected. "
+                f"NaN values (count: {df_result_post.isna().sum(axis=0)}) were detected. "
                 f"The applied rate constants are:\n {self.rate_constants_input.to_json()}")
 
-        # TODO remove df_result_pre
-        return df_result_pre, df_result_post
+        return df_result_post
 
     def _predict_slice_Euler(self,
                              initial_concentration: np.ndarray,
                              time_slice: np.ndarray,
-                             steps_per_step: int) -> tuple[pl.DataFrame, np.ndarray]:
+                             steps_per_step: int) -> tuple[pd.DataFrame, np.ndarray]:
         """
         Predicts the concentration of a singular time slice.
         :param initial_concentration: The initial concentration of the system.
@@ -266,8 +264,8 @@ class DRL:
             steps_per_step=steps_per_step)
 
         # do some formatting
-        df_result = pl.DataFrame(predicted_concentration, list(self.reference.keys()))
-        df_result = df_result.with_columns(pl.Series(name='time', values=time_slice))
+        df_result = pd.DataFrame(predicted_concentration, columns=list(self.reference.keys()))
+        df_result['time'] = time_slice
         return df_result, predicted_concentration[-1, :]
 
     def predict_concentration_Euler(self,
@@ -310,16 +308,17 @@ class DRL:
         )
 
         # validate the results
-        if results_post_addition.to_numpy().min() < 0:  # some leniency is required
+        if results_post_addition.to_numpy().flatten().min() < 0:
             raise InvalidPredictionError(
                 "Negative concentrations were detected, perhaps this was caused by a large dt.\n"
                 "Consider increasing the steps_per_step. The applied rate constants are:\n"
                 f"{self.rate_constants_input.to_json()}")
-        if np.isnan(results_post_addition.tail(1)).any():
+
+        if results_post_addition.tail(1).isna().values.any():
             raise InvalidPredictionError(
                 "NaN values were detected in the prediction, perhaps this was caused by a large dt.\n"
                 "Consider increasing the steps_per_step. The applied rate constants are:\n"
                 f"\n{self.rate_constants_input.to_json()}"
             )
 
-        return result_pre_addition, results_post_addition
+        return results_post_addition

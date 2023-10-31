@@ -1,9 +1,10 @@
+from __future__ import annotations
+
 import os
 import warnings
 
 import numpy as np
 import pandas as pd  # used for storage of the data, its series objects are much more powerful.
-import polars as pl  # used for more efficient calculations in the dataframes.
 
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -75,14 +76,14 @@ class OptimizerProgress:
 class RateConstantOptimizerTemplate(ABC):
     def __init__(self,
                  raw_weights: dict[str, float],
-                 experimental: pl.DataFrame,
+                 experimental: pd.DataFrame,
                  metric: Callable[[np.ndarray, np.ndarray], float]) -> None:
         """
         Initializes the Rate constant optimizer class.
         :param raw_weights: Dictionary containing str patterns as keys and the weight as values.
         The str patterns will be searched for in the keys of the results from the 'calculate_curves' function.
         The given weight will lower corresponding errors.
-        :param experimental: Polars dataframe containing the experimental data.
+        :param experimental: Pandas dataframe containing the experimental data.
         :param metric: The error metric which should be used. It must implement y_true and y_pred as its arguments.
         """
         self.raw_weights = raw_weights
@@ -95,14 +96,15 @@ class RateConstantOptimizerTemplate(ABC):
         # check if any of the curves are potentially problematic
         nan_warnings = []  #
         for curve_description, curve in self.experimental_curves.items():
-            if curve.is_nan().any():
-                nan_warnings.append(f"Experimental data curve for {curve_description} contains {curve.is_nan().sum()} NaN values.")
+            if np.isnan(curve).any():
+                nan_warnings.append(f"Experimental data curve for {curve_description} contains {np.isnan(curve).sum()} NaN values.")
+
         if nan_warnings:
             warnings.warn("\n".join(nan_warnings))
 
     @staticmethod
     @abstractmethod
-    def create_prediction(x: np.ndarray, x_description: list[str]) -> pl.DataFrame:
+    def create_prediction(x: np.ndarray, x_description: list[str]) -> pd.DataFrame:
         """
         Create a prediction of the system, given a set of parameters.
         :param x: Contains all parameters, which are to be optimized.
@@ -114,7 +116,7 @@ class RateConstantOptimizerTemplate(ABC):
 
     @staticmethod
     @abstractmethod
-    def calculate_curves(data: pl.DataFrame) -> dict[str, pl.Series]:
+    def calculate_curves(data: pd.DataFrame) -> dict[str, np.ndarray]:
         """
         Calculate the curves corresponding to the data (either experimental or predicted).
         The experimental curves will only be calculated once and are stored for subsequent use.
@@ -123,12 +125,10 @@ class RateConstantOptimizerTemplate(ABC):
         :return: dict containing a description of each curve, and the corresponding curve.
         """
 
-    def calculate_error_functions(self, prediction: pl.DataFrame) -> pd.Series:
+    def calculate_errors(self, prediction: pd.DataFrame) -> pd.Series:
         """
         Calculate the error caused by each error function.
-        The input is of the format of polars due to its computational efficiency.
-        It returns a Pandas Series as those are more powerful to work with.
-        :param prediction: Polars dataframe containing the predicted concentrations.
+        :param prediction: Pandas dataframe containing the predicted concentrations.
         :return: Pandas.Series containing the unweighted errors of each error function.
         """
         curves_predicted = self.calculate_curves(prediction)
@@ -141,6 +141,7 @@ class RateConstantOptimizerTemplate(ABC):
                 y_pred=curve_prediction)
             if np.isnan(error[curve_description]):
                 nan_warnings.append(f"The error function for {curve_description} is NaN.")
+
         if nan_warnings:
             raise ValueError("\n".join(nan_warnings))
         return pd.Series(error)
@@ -224,7 +225,7 @@ class RateConstantOptimizerTemplate(ABC):
             Proceeds to calculate the corresponding prediction and its total error.
             The results are stored in a log before the error is returned to the optimizer."""
             prediction = self.create_prediction(x, x_description)
-            errors = self.calculate_error_functions(prediction)
+            errors = self.calculate_errors(prediction)
             total_error = self.calculate_total_error(errors)
 
             logger.log(pd.Series([x, total_error], index=["x", "error"]))
@@ -280,7 +281,8 @@ class RateConstantOptimizerTemplate(ABC):
         :param x_bounds: A list containing tuples, containing the lower and upper boundaries for each parameter.
         :param x0_bounds: A list containing tuples, containing the lower and upper boundaries for the starting value of
             each parameter. By default, it is identical to the x_bounds. Lower bounds smaller than x0_min are set to x0_min.
-        :param x0_min: The minimum value the lower bound of x0_bounds can take. Any values lower than it, are set to
+            When the upper bound is 0, the corresponding x0 will also be set to 0. This disables the reaction.
+        :param x0_min: The minimum value the lower bound of x0_bounds can take. Any values lower than it is set to
             x0_min.
         :param n_jobs: The number of processes which should be used, if -1, all available cores are used.
         :param backend: The backend used by joblib.

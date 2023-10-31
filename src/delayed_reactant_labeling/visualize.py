@@ -1,9 +1,10 @@
+from __future__ import annotations
+
 import os
 from typing import Optional
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from sklearn.decomposition import PCA
 from tqdm import tqdm
 from delayed_reactant_labeling.predict import InvalidPredictionError
 from delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate, OptimizerProgress
@@ -117,7 +118,9 @@ class VisualizeSingleSolution:
         return fig, axs
 
     def show_optimization_path_in_pca(self, create_3d_video: bool = False, fps: int = 30) -> tuple[
-        plt.Figure, list[plt.Axes]]:
+            plt.Figure, list[plt.Axes]]:
+        from sklearn.decomposition import PCA
+
         # explore pca space
         fig = plt.figure(figsize=(8, 8))
         gs = fig.add_gridspec(2, 2, width_ratios=(1, 4), height_ratios=(4, 1),
@@ -161,15 +164,10 @@ class VisualizeSingleSolution:
             ax3d.tick_params(bottom=False, left=False,
                              labelbottom=False, labelleft=False)
 
-            # sub-function is used to return None to skip the remainder
             # Rotate the axes and update
             files = []
             files_folder = f"{self.path}/pca_rotation_animation"
-            try:
-                os.makedirs(files_folder)
-            except FileExistsError:
-                print("Already a folder containing the pca_rotation exists. skipping...")
-                return None
+            os.makedirs(files_folder)
 
             for n, angle in tqdm(enumerate(range(0, 360 * 4 + 1))):
                 # Normalize the angle to the range [-180, 180] for display
@@ -206,7 +204,7 @@ class VisualizeSingleSolution:
         return fig, [ax, ax_pc0, ax_pc1]
 
     def show_error_contributions(self) -> tuple[plt.Figure, plt.Axes]:
-        errors = self.rate_constant_optimizer.calculate_error_functions(self.best_prediction)
+        errors = self.rate_constant_optimizer.calculate_errors(self.best_prediction)
         weighed_errors = self.rate_constant_optimizer.weigh_errors(errors)
         fig, ax = plt.subplots()
         weighed_errors.plot.bar(ax=ax)
@@ -218,7 +216,6 @@ class VisualizeSingleSolution:
         return fig, ax
 
     def show_enantiomer_ratio(self, intermediates: list[str], experimental: pd.DataFrame) -> tuple[plt.Figure, plt.Axes]:
-        from polars.exceptions import ColumnNotFoundError
         fig, ax = plt.subplots()
         ax.set_title(self.description)
         plotted_label = False
@@ -249,7 +246,7 @@ class VisualizeSingleSolution:
                     y_exp = y_exp[-60:].mean()
                     ax.scatter(x, y_exp, label=label, marker="x", alpha=0.7, color=f"C{i}")
                 plotted_label = True
-            except ColumnNotFoundError:
+            except KeyError:
                 print(f"could not find {intermediate} in the experimental data. skipping...")
 
         ax.set_ylabel("isomer fraction")
@@ -275,7 +272,6 @@ class VisualizeSingleSolution:
             raise ValueError("specified to analyze more frames than available iterations")
 
         fig, (ax_rates, ax_error) = plt.subplots(2)
-        ax_ratio = ax_error.twinx()
 
         ticks = self.progress.all_X.columns[~self.index_constant_values]
         x = np.arange(len(ticks))
@@ -302,11 +298,9 @@ class VisualizeSingleSolution:
 
             # update the error plot
             ax_error.scatter(i, self.progress.all_errors[i], color="tab:blue")
-            ax_ratio.scatter(i, self.progress.all_ratios[i], color="tab:orange")
 
             ax_error.set_xlabel("iteration")
             ax_error.set_ylabel("MAE", color="tab:blue")
-            ax_ratio.set_ylabel("ratio", color="tab:orange")
             fig.suptitle(f"{self.description}")
 
             file = f"{files_folder}/frame_{i}.jpg"
@@ -337,10 +331,10 @@ class VisualizeSingleSolution:
                 best_X[key] = adjusted_x
                 try:
                     prediction = self.rate_constant_optimizer.create_prediction(
-                        x=best_X.to_numpy(), x_description=self.progress.x_description)[0]
-                    unweighed_error = self.rate_constant_optimizer.calculate_error_functions(prediction)
+                        x=best_X.to_numpy(), x_description=self.progress.x_description)
+                    unweighed_error = self.rate_constant_optimizer.calculate_errors(prediction)
                     found_error = self.rate_constant_optimizer.calculate_total_error(unweighed_error)
-                except InvalidPredictionError as e:
+                except InvalidPredictionError:
                     found_error = np.nan
                 errors[row, col] = found_error
 
@@ -452,10 +446,12 @@ class VisualizeMultipleSolutions:
 
     def show_biplot(self,
                     max_error: float,
-                    index_constant_values: np.ndarray,
                     pc1: int = 0,
                     pc2: int = 1,
                     ax: plt.Axes = None):
+        from sklearn.decomposition import PCA
+        from sklearn.preprocessing import StandardScaler
+
         if ax is None:
             fig, ax = plt.subplots()
         else:
@@ -467,9 +463,6 @@ class VisualizeMultipleSolutions:
                 continue
             data.append(initial)
             data.append(optimal)
-
-        from sklearn.decomposition import PCA
-        from sklearn.preprocessing import StandardScaler
 
         data = pd.DataFrame(data).reset_index(drop=True)  # by converting to df first, we assure that the columns are aligned
         scaler = StandardScaler()
