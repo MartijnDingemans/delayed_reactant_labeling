@@ -7,7 +7,7 @@ import polars as pl
 from icecream import ic
 
 from src.delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate
-from src.delayed_reactant_labeling.predict_new import DRL
+from src.delayed_reactant_labeling.predict import DRL
 
 EXPERIMENTAL_DATA_PATH = 'experimental_data_Roelant.xlsx'  # the absolute path can also be given
 CONCENTRATIONS_INITIAL = {"cat": 0.005 * 40 / 1200,  # concentration in M
@@ -275,7 +275,7 @@ vertex = np.array(vertex)
 
 RCO.optimize(path='examples_optimization/example_optimize_singular/',
              x0=vertex,
-             bounds=bounds,
+             x_bounds=bounds,
              x_description=x_description, maxiter=200,
              _overwrite_log=True)
 

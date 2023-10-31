@@ -9,7 +9,7 @@ rate_constants = {
 
 import numpy as np
 from scipy.integrate import solve_ivp
-from delayed_reactant_labeling.predict_new import DRL
+from delayed_reactant_labeling.predict import DRL
 time = np.linspace(0, 20, 2000)
 k1, k2 = rate_constants['k1'], rate_constants['k2']
 A0 = 1
