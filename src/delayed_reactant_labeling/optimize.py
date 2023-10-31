@@ -174,7 +174,7 @@ class RateConstantOptimizerTemplate(ABC):
     def optimize(self,
                  x0: np.ndarray,
                  x_description: list[str],
-                 bounds: list[tuple[float, float]],
+                 x_bounds: list[tuple[float, float]],
                  path: str,
                  metadata: Optional[dict] = None,
                  maxiter: float = 50000,
@@ -187,7 +187,7 @@ class RateConstantOptimizerTemplate(ABC):
         Optimizes the system, utilizing a nelder-mead algorithm.
         :param x0: Parameters which are to be optimized. Always contain the rate constants.
         :param x_description: Description of each parameter.
-        :param bounds: A list containing tuples, which in turn contain the lower and upper bound for each parameter.
+        :param x_bounds: A list containing tuples, which in turn contain the lower and upper bound for each parameter.
         :param path: Where the solution should be stored.
         :param metadata: The metadata that should be saved alongside the solution.
         :param maxiter: The maximum number of iterations.
@@ -207,7 +207,7 @@ class RateConstantOptimizerTemplate(ABC):
                 "raw_weights": self.raw_weights,
                 "x0": x0,
                 "x_description": x_description,
-                "bounds": bounds,
+                "bounds": x_bounds,
                 "maxiter": maxiter
             }
             if metadata is not None:
@@ -241,7 +241,7 @@ class RateConstantOptimizerTemplate(ABC):
                     minimize(fun=optimization_step,
                              x0=x0,
                              method="Nelder-Mead",
-                             bounds=bounds,
+                             bounds=x_bounds,
                              callback=update_tqdm,
                              options={"maxiter": maxiter, "disp": True, "adaptive": True, "return_all": False,
                                       "initial_simplex": resume_from_simplex})
@@ -250,7 +250,7 @@ class RateConstantOptimizerTemplate(ABC):
                 minimize(fun=optimization_step,
                          x0=x0,
                          method="Nelder-Mead",
-                         bounds=bounds,
+                         bounds=x_bounds,
                          options={"maxiter": maxiter, "disp": True, "adaptive": True, "return_all": False,
                                   "initial_simplex": resume_from_simplex})
         except Exception as e:
@@ -284,10 +284,10 @@ class RateConstantOptimizerTemplate(ABC):
         :param optimize_kwargs: The key word arguments that will be passed to self.optimize.
         """
         try:
-            os.mkdir(f'{path}/optimization_multiple_guess')
+            os.mkdir(path)
             start_seed = 0
         except FileExistsError:
-            start_seed = len(os.listdir(f'{path}/optimization_multiple_guess'))
+            start_seed = len(os.listdir(path))
             warnings.warn("Cannot create a directory when that directory already exists. "
                           f"Appending results instead starting with seed {start_seed}")
 
@@ -312,14 +312,14 @@ class RateConstantOptimizerTemplate(ABC):
         rv = loguniform
         rv.random_state = seed
         x0 = np.array([rv.rvs(lb, ub) for lb, ub in x0_bounds])
-        path = f'{path}/optimization_multiple_guess/guess_{seed}/'
+        path = f'{path}/guess_{seed}/'
         os.mkdir(path)
 
         try:
             self.optimize(
                 x0=x0,
                 x_description=x_description,
-                bounds=x_bounds,
+                x_bounds=x_bounds,
                 path=path,
                 pbar_show=False,
                 **optimize_kwargs
