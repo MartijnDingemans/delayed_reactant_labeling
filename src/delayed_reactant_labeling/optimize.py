@@ -1,14 +1,18 @@
 import os
 import warnings
-from abc import ABC, abstractmethod
-from datetime import datetime
-from typing import Optional, Callable
 
 import numpy as np
 import pandas as pd  # used for storage of the data, its series objects are much more powerful.
 import polars as pl  # used for more efficient calculations in the dataframes.
+
+from abc import ABC, abstractmethod
+from datetime import datetime
+from typing import Optional, Callable
+from copy import deepcopy
+
 from joblib import Parallel, delayed
 from scipy.optimize import minimize
+from scipy.stats import loguniform
 from tqdm import tqdm
 
 from delayed_reactant_labeling.predict import InvalidPredictionError
@@ -256,20 +260,27 @@ class RateConstantOptimizerTemplate(ABC):
     def optimize_multiple(self,
                           path: str,
                           n_runs: int,
-                          bounds: list[tuple[float, float]],
                           x_description: list[str],
+                          x_bounds: list[tuple[float, float]],
+                          x0_bounds: Optional[list[tuple[float, float]]] = None,
+                          x0_min: float = 1e-6,
                           n_jobs: int = 1,
                           **optimize_kwargs):
         """
         Optimizes the system, utilizing a nelder-mead algorithm, for a given number of runs. Each run has random
-        starting positions for each parameter, which is uniformly distributed between its lower and upper bounds.
-        If the given path already has an existing directory called 'optimization_multiple_guess', the optimization will
-        be resumed from that point onwards.
+        starting positions for each parameter, which is distributed according to a loguniform distribution. The bounds
+        of the starting position (x0_bounds) can be separately controlled from the bounds the system is allowed to
+        explore (x_bounds). If the given path already has an existing directory called 'optimization_multiple_guess',
+        the optimization will be resumed from that point onwards.
         :param path: Where the solution should be stored.
         :param n_runs: The number of runs which are to be computed.
-        :param bounds: A list containing tuples, which in turn contain the lower and upper bound for each parameter.
         :param x_description: Description of each parameter.
-        :param n_jobs: The number of processes which should be used, if -1 all available cores are used.
+        :param x_bounds: A list containing tuples, containing the lower and upper boundaries for each parameter.
+        :param x0_bounds: A list containing tuples, containing the lower and upper boundaries for the starting value of
+            each parameter. By default, it is identical to the x_bounds. Lower bounds smaller than x0_min are set to x0_min.
+        :param x0_min: The minimum value the lower bound of x0_bounds can take. Any values lower than it, are set to
+            x0_min.
+        :param n_jobs: The number of processes which should be used, if -1, all available cores are used.
         :param optimize_kwargs: The key word arguments that will be passed to self.optimize.
         """
         try:
@@ -280,27 +291,41 @@ class RateConstantOptimizerTemplate(ABC):
             warnings.warn("Cannot create a directory when that directory already exists. "
                           f"Appending results instead starting with seed {start_seed}")
 
-        Parallel(n_jobs=n_jobs, verbose=100)(
-            delayed(self._mp_work_list)(seed, bounds, x_description, path, optimize_kwargs)
-            for seed in range(start_seed, start_seed + n_runs))
+        if x0_bounds is None:
+            x0_bounds = deepcopy(x_bounds)
 
-    def _mp_work_list(self, seed, bounds, x_description, path, optimize_kwargs):
-        rng = np.random.default_rng(seed)
-        vertex = np.array([rng.random() * (ub - lb) + lb for lb, ub in bounds])
+        x0_bounds = [(lb, ub,) if lb > x0_min else (x0_min, ub) for lb, ub in x0_bounds]
+
+        Parallel(n_jobs=n_jobs, verbose=100)(
+            delayed(self._mp_work_list)(
+                seed=seed,
+                x_description=x_description,
+                x_bounds=x_bounds,
+                x0_bounds=x0_bounds,
+                path=path,
+                optimize_kwargs=optimize_kwargs
+            )
+            for seed in range(start_seed, start_seed + n_runs)
+        )
+
+    def _mp_work_list(self, seed, x_description, x_bounds, x0_bounds, path, optimize_kwargs):
+        rv = loguniform
+        rv.random_state = seed
+        x0 = np.array([rv.rvs(lb, ub) for lb, ub in x0_bounds])
         path = f'{path}/optimization_multiple_guess/guess_{seed}/'
         os.mkdir(path)
 
         try:
             self.optimize(
-                x0=vertex,
+                x0=x0,
                 x_description=x_description,
-                bounds=bounds,
+                bounds=x_bounds,
                 path=path,
                 pbar_show=False,
                 **optimize_kwargs
             )
         except InvalidPredictionError:
-            pass  # results are stored incase an error occurred.
+            pass  # results are stored incase an error occurred due to self.optimize.
 
     @staticmethod
     def load_optimization_progress(path: str) -> OptimizerProgress:
