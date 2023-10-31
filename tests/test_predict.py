@@ -5,7 +5,7 @@ import numpy as np
 from scipy.integrate import solve_ivp
 from sklearn.metrics import mean_absolute_percentage_error
 
-from delayed_reactant_labeling.predict_new import DRL
+from delayed_reactant_labeling.predict import DRL
 
 
 NUMBA_CAPTURED_ERRORS='new_style'
@@ -87,6 +87,9 @@ class MyTestCase(unittest.TestCase):
         # make sure everything has compiled
         drl = DRL(
             rate_constants=rate_constants_ABC, reactions=reactions_ABC, output_order=['A', 'B', 'C'], verbose=False)
+        _ = solve_ivp(
+            drl.calculate_step, t_span=[time[0], time[-1]], y0=[A0, 0, 0], method='Radau', t_eval=time, jac=drl.calculate_jac,
+            rtol=rtol, atol=atol)
         _ = solve_ivp(
             drl.calculate_step, t_span=[time[0], time[-1]], y0=[A0, 0, 0], method='Radau', t_eval=time, jac=None,
             rtol=rtol, atol=atol)
