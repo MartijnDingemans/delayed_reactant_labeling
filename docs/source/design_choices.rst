@@ -17,10 +17,12 @@ For each reaction we can calculate the amount of created chemical:
 
 .. math::
 
-    dc_r = k_r \cdot \prod{[reactants_r]}
+    dc_r = k_r \cdot \prod{[q_r]}
 
-where, k is the rate constant for reaction r. We can subtract this amount of created chemical from each reactant, and
+where, :math:`k` is the rate constant for reaction :math:`r` with reactants :math:`q`. We can subtract this amount of created chemical from each reactant, and
 add it to each product to get the rate of change.
+
+.. _Jacobian:
 
 Estimating the Jacobian
 -----------------------
@@ -30,16 +32,16 @@ model into individual reaction steps:
 
 .. math::
 
-    J_{i, j} =  \frac{di}{dj} = \sum_{r}{\frac{di_r}{dj}}
+    J_{i, j} =  \frac{\delta i}{\delta j} = \sum_{r}{\frac{\delta i_r}{\delta j}}
 
 For each reaction we than calculate the derivative with respect to each reactant. This is because the rate equation
 due to this reaction is by definition the rate constant multiplied by the concentration of each reactant, and the derivative
 with respect to non-reactants is zero. To calculate the derivative we than take the product of the concentrations of all
-reactants, :math:`p`, except the reactant whose derivative we take.
+reactants, :math:`q`, except the reactant whose derivative we take.
 
 .. math::
 
-    \frac{di_r}{dj} = k_r \cdot \prod^{p}_{p \ne j}{[p]}
+    \frac{\delta i_r}{\delta j} = k_r \cdot \prod^{q_r}_{q_r \ne j}{[q_r]}
 
 Subsequently we multiply this with the rate constant, :math:`k`, and add this to all reaction products, whereas
 we subtract it from each reactant. Because we take a very simple approach to calculating the derivative, this method only
@@ -62,4 +64,4 @@ array of predicted concentration is saved at the corresponding time stamp.
 
 This method does not work well in stiff problems and using an ODE solver is recommended.
 
-.. _Jacobian:
+
