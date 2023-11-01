@@ -1,15 +1,16 @@
-from copy import deepcopy
+from __future__ import annotations
 
-import matplotlib.pyplot as plt
+from copy import deepcopy
 import numpy as np
 import pandas as pd
-import polars as pl
-from icecream import ic
+
+import sys
+sys.path.insert(1, r'C:\Users\mdingemans\delayed_reactant_labeling\src')
 
 from delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate
 from delayed_reactant_labeling.predict import DRL
 
-EXPERIMENTAL_DATA_PATH = 'experimental_data_Roelant.xlsx'  # the absolute path can also be given
+EXPERIMENTAL_DATA_PATH = r'experimental_data_Roelant.xlsx'
 CONCENTRATIONS_INITIAL = {"cat": 0.005 * 40 / 1200,  # concentration in M
                           "2": 0.005 * 800 / 1200}
 CONCENTRATION_LABELED_REACTANT = {"2'": 0.005 * 800 / 2000}
@@ -18,23 +19,24 @@ DILUTION_FACTOR = 1200 / 2000
 TIME_OF_ADDITION_COMPOUND = 0  # in minutes; start of the reaction
 TIME_OF_ADDITION_LABELED_COMPOUND = 10.15  # in minutes; start of DRL curves
 
-experimental_complete = pl.read_excel(EXPERIMENTAL_DATA_PATH, engine='openpyxl')
+experimental_complete = pd.read_excel(EXPERIMENTAL_DATA_PATH, engine='openpyxl')
 time_complete = experimental_complete["time (min)"]  # pre- and post-addition
 
 labeled_chemicals = [chemical for chemical in experimental_complete.columns if chemical[-1] == "'"]
-index_compound = np.argmax(experimental_complete["time (min)"] > TIME_OF_ADDITION_COMPOUND)
-index_labeled_compound = np.argmax(experimental_complete["time (min)"] > TIME_OF_ADDITION_LABELED_COMPOUND)
+index_compound = np.argmax(
+    experimental_complete["time (min)"] > TIME_OF_ADDITION_COMPOUND)  # first element of the post-addition situation
+index_labeled_compound = np.argmax(experimental_complete[
+                                       "time (min)"] > TIME_OF_ADDITION_LABELED_COMPOUND)  # first element of the post-addition situation
 
 # correct for noise in intensity (y-axis) for the labeled chemicals!
-experimental_complete = experimental_complete.with_columns(
-    [(pl.col(chemical) - pl.col(chemical).slice(index_labeled_compound - 10, 10).median()).alias(chemical) for
-     chemical in labeled_chemicals]
-)
+for chemical in labeled_chemicals:
+    experimental_complete[chemical] = experimental_complete[chemical] - experimental_complete[chemical].iloc[index_labeled_compound - 10:index_labeled_compound].median()
+
 
 # only the situation post-addition of labeled compound is relevant for other parts of the script
-experimental = experimental_complete[index_labeled_compound:, :]
+experimental = experimental_complete.iloc[index_labeled_compound:, :]
 time = experimental["time (min)"].to_numpy()
-time_pre = experimental_complete['time (min)'][:index_labeled_compound].to_numpy()
+time_pre = experimental_complete.loc[:index_labeled_compound, 'time (min)'].to_numpy()
 
 WEIGHT_TIME = 1 - 0.9 * np.linspace(0, 1, time.shape[
     0])  # decrease weight with time, first point 10 times as import as last point
@@ -121,27 +123,29 @@ WEIGHTS = {
 
 class RateConstantOptimizer(RateConstantOptimizerTemplate):
     @staticmethod
-    def calculate_curves(data: pl.DataFrame) -> dict[str: pl.Series]:
+    def calculate_curves(data: pd.DataFrame) -> dict[str, np.ndarray]:
         curves = {}
         for intermediate in INTERMEDIATES:
             # sum does not have to be recalculated between the isomer runs
-            sum_all_isomers = data[[intermediate + isomer for isomer in ISOMERS]].sum(axis=1)
+            sum_all_isomers = data[[f'{intermediate}{isomer}' for isomer in ISOMERS]].sum(axis=1)
             for isomer in ISOMERS:
                 chemical = f"{intermediate}{isomer}"  # 3D, 3E, 3F, 4/5D, 4/5E, 3/5F
                 chemical_iso_split = f"int_{intermediate}_iso_{isomer}"  # allows for easy modification of weight. str.contains('int_1') is much more specific than just '1'
 
                 sum_chemical = data[[chemical, f"{chemical}'"]].sum(axis=1)
 
-                curves[f"label_{chemical_iso_split}"] = data[chemical] / sum_chemical  # 3D / (3D+3D')
-                curves[f"isomer_{chemical_iso_split}"] = data[chemical] / sum_all_isomers  # 3D / (3D+3E+3F)
-                curves[f"TIC_{chemical_iso_split}"] = data[chemical] / sum_chemical[
-                                                                       -100:].mean()  # normalized TIC curve
-                curves[f"TIC_{chemical_iso_split}'"] = data[f"{chemical}'"] / sum_chemical[
-                                                                              -100:].mean()  # normalized TIC curve
+                curves[f"label_{chemical_iso_split}"] = (
+                    data[chemical] / sum_chemical).to_numpy()  # 3D / (3D+3D')
+                curves[f"isomer_{chemical_iso_split}"] = (
+                    data[chemical] / sum_all_isomers).to_numpy()  # 3D / (3D+3E+3F)
+                curves[f"TIC_{chemical_iso_split}"] = (
+                        data[chemical] / sum_chemical[-100:].mean()).to_numpy()  # normalized TIC curve
+                curves[f"TIC_{chemical_iso_split}'"] = (
+                        data[f"{chemical}'"] / sum_chemical[-100:].mean()).to_numpy()  # normalized TIC curve
         return curves
 
     @staticmethod
-    def create_prediction(x: np.ndarray, x_description: list[str]) -> pl.DataFrame:
+    def create_prediction(x: np.ndarray, x_description: list[str]) -> pd.DataFrame:
         # separate out the ionization factor from the other parameters which are being optimized.
         rate_constants = pd.Series(x[:len(rate_constant_names)], index=x_description[:len(rate_constant_names)])
         ionization_factor = x[-1]
@@ -155,7 +159,7 @@ class RateConstantOptimizer(RateConstantOptimizerTemplate):
                   verbose=False)  # stores values in drl.reactions which describe which reactant and products react.
 
         # prediction unlabeled is unused
-        prediction_unlabeled, prediction_labeled = drl.predict_concentration(
+        prediction_labeled = drl.predict_concentration(
             t_eval_pre=time_pre,
             t_eval_post=time,
             initial_concentrations=CONCENTRATIONS_INITIAL,
@@ -168,54 +172,14 @@ class RateConstantOptimizer(RateConstantOptimizerTemplate):
         # SYSTEM-SPECIFIC ENAMINE IONIZATION CORRECTION -> only a prediction of 4/5 can be made!
         for isomer in ISOMERS:
             for label in ["", "'"]:
-                prediction_labeled = prediction_labeled.with_columns(
-                    (pl.col(f"5{isomer}{label}") + ionization_factor * pl.col(f"4{isomer}{label}")).alias(
-                        f"4/5{isomer}{label}")
-                )
+                prediction_labeled.loc[:, f"4/5{isomer}{label}"] = \
+                    prediction_labeled.loc[:, f"5{isomer}{label}"] \
+                    + ionization_factor * prediction_labeled.loc[:, f"4{isomer}{label}"]
 
         return prediction_labeled
 
 
 RCO = RateConstantOptimizer(raw_weights=WEIGHTS, experimental=experimental, metric=METRIC)
-
-# these rate constants were found by Roelant et al. and are used as a example only
-rate_constants_roelant = {
-    "k1_D": 1.5,
-    "k1_E": 0.25,
-    "k1_F": 0.01,
-    "k2_D": 0.43,
-    "k2_E": 0.638,
-    "k2_F": 0.567,
-    "k3_D": 0.23,
-    "k3_E": 0.35,
-    "k3_F": 0.3,
-    "k4_D": 8,
-    "k4_E": 0.05,
-    "k4_F": 0.03,
-    "k-1_D": 0,
-    "k-1_E": 0,
-    "k-1_F": 0,
-    "k-2_D": 0.025,
-    "k-2_E": 0.035,
-    "k-2_F": 0.03,
-    "k-3_D": 0,
-    "k-3_E": 0,
-    "k-3_F": 0,
-    "k-4_D": 0,
-    "k-4_E": 0,
-    "k-4_F": 0,
-}
-
-# define your inputs
-x = np.array(list(rate_constants_roelant.values()) + [0.025])
-x_description = list(rate_constants_roelant.keys()) + ['ion']
-labeled_prediction = RCO.create_prediction(x=x, x_description=x_description)
-errors = RCO.calculate_error_functions(labeled_prediction)
-weighed_errors = RCO.weigh_errors(errors)
-
-df = pd.DataFrame([errors, weighed_errors], index=["normal", "weighed"]).T
-print(df)
-ic(weighed_errors.sum())
 
 # the rate constant optimizer class is independent of your predicted run.
 x_description = rate_constant_names + ['ion']
@@ -223,82 +187,27 @@ constraints = pd.DataFrame(np.full((3, len(x_description)), np.nan), index=["ver
                            columns=x_description).T
 
 index_reverse_reaction = constraints.index.str.contains("k-")
-constraints[~index_reverse_reaction] = [1, 1e-6, 1e3]  # forwards; vertex, lb, ub
-constraints[index_reverse_reaction] = [0.5, 0, 1e3]  # backwards
+constraints.iloc[np.nonzero(~index_reverse_reaction)] = [1, 1e-6, 1e3]  # forwards; vertex, lb, ub
+constraints.iloc[np.nonzero(index_reverse_reaction)] = [0.5, 0, 1e3]  # backwards
 
 # special case
-constraints[constraints.index.str.contains("ion")] = [0.01, 1e-6, 1]
+constraints.iloc[np.nonzero(constraints.index.str.contains("ion"))] = [0.01, 1e-6, 1]
 
-constraints[constraints.index.str.contains("k2_D")] = [0.410972, 0.3789, 0.4530]
-constraints[constraints.index.str.contains("k2_E")] = [0.644027, 0.5227, 0.8002]
-constraints[constraints.index.str.contains("k2_F")] = [0.510573, 0.2763, 1.1920]
+constraints.iloc[np.nonzero(constraints.index.str.contains("k2_D"))] = [0.410972, 0.3789, 0.4530]
+constraints.iloc[np.nonzero(constraints.index.str.contains("k2_E"))] = [0.644027, 0.5227, 0.8002]
+constraints.iloc[np.nonzero(constraints.index.str.contains("k2_F"))] = [0.510573, 0.2763, 1.1920]
 
 # either chemically or experimentally determined to be zero
-constraints[constraints.index.str.contains("k-1")] = [0, 0, 0]
-constraints[constraints.index.str.contains("k-3")] = [0, 0, 0]
-constraints[constraints.index.str.contains("k-4")] = [0, 0, 0]
+constraints.iloc[np.nonzero(constraints.index.str.contains("k-1"))] = [0, 0, 0]
+constraints.iloc[np.nonzero(constraints.index.str.contains("k-3"))] = [0, 0, 0]
+constraints.iloc[np.nonzero(constraints.index.str.contains("k-4"))] = [0, 0, 0]
 bounds = [(lb, ub,) for _, (_, lb, ub) in constraints.iterrows()]
 
-
-vertex = [
-    0.000000,
-    0.000000,
-    0.000000,
-    285.801380,
-    53.930702,
-    383.368881,
-    0.000000,
-    0.000000,
-    0.000000,
-    0.000000,
-    0.000000,
-    0.000000,
-    434.947552,
-    974.186193,
-    897.677608,
-    0.410972,
-    0.644027,
-    0.510573,
-    676.689352,
-    60.802713,
-    555.596117,
-    271.451605,
-    879.651173,
-    64.214437,
-    0.01
-]
-vertex = np.array(vertex)
-
-# vertex = constraints['vertex'].to_numpy()
-
-RCO.optimize(path='examples_optimization/example_optimize_singular/',
-             x0=vertex,
-             x_bounds=bounds,
-             x_description=x_description, maxiter=200,
-             _overwrite_log=True)
-
-fig, axs = plt.subplots(3, 1, tight_layout=True, figsize=(8, 8), squeeze=False)
-
-true_curves = RCO.experimental_curves
-pred_curves = RCO.calculate_curves(labeled_prediction)
-
-for i, intermediate in enumerate(INTERMEDIATES):
-    for j, isomer in enumerate(ISOMERS):
-        chemical_iso_split = f"int_{intermediate}_iso_{isomer}"
-
-        # plot label ratio
-        axs[j, 0].plot(time, pred_curves[f"label_{chemical_iso_split}"], color=f"C{i}",
-                       label=f"{chemical_iso_split} MAE: {errors[f'label_{chemical_iso_split}']:.3f}")
-        axs[j, 0].scatter(time, true_curves[f"label_{chemical_iso_split}"],
-                          color=f"C{i}", alpha=0.4, marker=".", s=1)
-
-        # the curve of the labeled compound is the same, by definition, as 1 - unlabeled
-        axs[j, 0].plot(time, 1 - pred_curves[f"label_{chemical_iso_split}"], color="tab:gray")
-        axs[j, 0].scatter(time, 1 - true_curves[f"label_{chemical_iso_split}"], color="tab:gray", alpha=0.4, marker=".", s=1)
-
-
-fig.supylabel("labeled ratio")
-fig.supxlabel("time (min)")
-for ax in axs.flatten():
-    ax.legend()
-fig.show()
+RCO.optimize_multiple(
+    path=r'./optimize/',
+    n_runs=64,
+    x_description=x_description,
+    x_bounds=bounds,
+    n_jobs=16,
+    maxiter=2000,
+)

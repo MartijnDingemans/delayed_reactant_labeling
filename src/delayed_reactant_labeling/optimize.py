@@ -13,8 +13,9 @@ from copy import deepcopy
 
 from joblib import Parallel, delayed
 from scipy.optimize import minimize
-from scipy.stats import loguniform
 from tqdm import tqdm
+from random import random
+from math import log
 
 from delayed_reactant_labeling.predict import InvalidPredictionError
 
@@ -266,8 +267,6 @@ class RateConstantOptimizerTemplate(ABC):
                           x0_bounds: Optional[list[tuple[float, float]]] = None,
                           x0_min: float = 1e-6,
                           n_jobs: int = 1,
-                          backend: str = "loky",
-                          batch_size: int = "auto",
                           **optimize_kwargs):
         """
         Optimizes the system, utilizing a nelder-mead algorithm, for a given number of runs. Each run has random
@@ -285,8 +284,6 @@ class RateConstantOptimizerTemplate(ABC):
         :param x0_min: The minimum value the lower bound of x0_bounds can take. Any values lower than it is set to
             x0_min.
         :param n_jobs: The number of processes which should be used, if -1, all available cores are used.
-        :param backend: The backend used by joblib.
-        :param batch_size: The size of each batch used by joblib.
         :param optimize_kwargs: The key word arguments that will be passed to self.optimize.
         """
         try:
@@ -302,7 +299,7 @@ class RateConstantOptimizerTemplate(ABC):
 
         x0_bounds = [(lb, ub,) if lb > x0_min else (x0_min, ub) for lb, ub in x0_bounds]
 
-        Parallel(n_jobs=n_jobs, verbose=100, backend=backend, batch_size=batch_size)(
+        Parallel(n_jobs=n_jobs, verbose=100, backend="loky")(
             delayed(self._mp_work_list)(
                 seed=seed,
                 x_description=x_description,
@@ -315,9 +312,11 @@ class RateConstantOptimizerTemplate(ABC):
         )
 
     def _mp_work_list(self, seed, x_description, x_bounds, x0_bounds, path, optimize_kwargs):
-        rv = loguniform
-        rv.random_state = seed
-        x0 = np.array([rv.rvs(lb, ub) if ub > 0 else 0 for lb, ub in x0_bounds])
+        # log uniform from scipy is not supported in 1.3.3
+        def loguniform(lo, hi):
+            return lo ** ((((log(hi) / log(lo)) - 1) * random()) + 1)
+
+        x0 = np.array([loguniform(lb, ub) if ub > 0 else 0 for lb, ub in x0_bounds])
         path = f'{path}/guess_{seed}/'
         os.mkdir(path)
 
@@ -330,8 +329,7 @@ class RateConstantOptimizerTemplate(ABC):
                 pbar_show=False,
                 **optimize_kwargs
             )
-        except InvalidPredictionError as e:
-            warnings.warn(f"Invalid prediction was found for seed {seed}: {e}")
+        except InvalidPredictionError:
             pass  # results are stored incase an error occurred due to self.optimize.
 
     @staticmethod
