@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 import pandas as pd
 import polars as pl
@@ -239,6 +241,7 @@ class DRL:
                 f"NaN values (count: {np.isnan(df_result_post.to_numpy).sum()}) were detected. "
                 f"The applied rate constants are:\n {self.rate_constants_input.to_json()}")
 
+        # TODO remove df_result_pre
         return df_result_pre, df_result_post
 
     def _predict_slice_Euler(self,
