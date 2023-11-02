@@ -6,3 +6,6 @@ pyproject.toml
 /src/delayed_reactant_labeling.egg-info/
 /docs/build/
 /dist/
+/venv311/
+/venv38/
+/examples/optimization/
