@@ -179,9 +179,8 @@ class RateConstantOptimizerTemplate(ABC):
                  metadata: Optional[dict] = None,
                  maxiter: float = 50000,
                  resume_from_simplex=None,
-                 pbar_show=True,
+                 show_pbar=True,
                  _overwrite_log=False,
-                 **tqdm_kwargs
                  ) -> None:
         """
         Optimizes the system, utilizing a nelder-mead algorithm.
@@ -192,8 +191,7 @@ class RateConstantOptimizerTemplate(ABC):
         :param metadata: The metadata that should be saved alongside the solution.
         :param maxiter: The maximum number of iterations.
         :param resume_from_simplex: When a simplex is given, the solution starts here.
-        :param pbar_show: If True, shows a progress bar.
-        :param tqdm_kwargs: Keyword arguments for the progress bar (tqdm).
+        :param show_pbar: If True, shows a progress bar.
         :param _overwrite_log: If True, the logs will be overwritten.
             Should only be used in test scripts to avoid accidental loss of data.
         """
@@ -231,12 +229,12 @@ class RateConstantOptimizerTemplate(ABC):
             return total_error
 
         try:
-            if pbar_show:
+            if show_pbar:
                 def update_tqdm(_):
                     """update the progress bar"""
                     pbar.update(1)
 
-                with tqdm(total=maxiter, miniters=25, **tqdm_kwargs) as pbar:
+                with tqdm(total=maxiter, miniters=25) as pbar:
                     # the minimization process is stored within the log, containing all x's and errors.
                     minimize_neldermead(
                         func=optimization_step,
@@ -328,7 +326,7 @@ class RateConstantOptimizerTemplate(ABC):
                 x_description=x_description,
                 x_bounds=x_bounds,
                 path=path,
-                pbar_show=False,
+                show_pbar=False,
                 **optimize_kwargs
             )
         except InvalidPredictionError as e:
