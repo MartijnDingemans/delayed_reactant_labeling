@@ -6,8 +6,8 @@ import pandas as pd
 import polars as pl
 from icecream import ic
 
-from src.delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate
-from src.delayed_reactant_labeling.predict import DRL
+from delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate
+from delayed_reactant_labeling.predict import DRL
 
 EXPERIMENTAL_DATA_PATH = 'experimental_data_Roelant.xlsx'  # the absolute path can also be given
 CONCENTRATIONS_INITIAL = {"cat": 0.005 * 40 / 1200,  # concentration in M
@@ -22,10 +22,8 @@ experimental_complete = pl.read_excel(EXPERIMENTAL_DATA_PATH, engine='openpyxl')
 time_complete = experimental_complete["time (min)"]  # pre- and post-addition
 
 labeled_chemicals = [chemical for chemical in experimental_complete.columns if chemical[-1] == "'"]
-index_compound = np.argmax(
-    experimental_complete["time (min)"] > TIME_OF_ADDITION_COMPOUND)  # first element of the post-addition situation
-index_labeled_compound = np.argmax(experimental_complete[
-                                       "time (min)"] > TIME_OF_ADDITION_LABELED_COMPOUND)  # first element of the post-addition situation
+index_compound = np.argmax(experimental_complete["time (min)"] > TIME_OF_ADDITION_COMPOUND)
+index_labeled_compound = np.argmax(experimental_complete["time (min)"] > TIME_OF_ADDITION_LABELED_COMPOUND)
 
 # correct for noise in intensity (y-axis) for the labeled chemicals!
 experimental_complete = experimental_complete.with_columns(
