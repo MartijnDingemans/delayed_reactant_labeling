@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 import warnings
 from abc import ABC, abstractmethod
-from copy import deepcopy
 from datetime import datetime
 from math import log
 from random import random
