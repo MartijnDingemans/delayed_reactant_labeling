@@ -20,6 +20,7 @@ extensions = [
 
 templates_path = ['_templates']
 exclude_patterns = []
+toc_object_entries_show_parents = 'hide'
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
@@ -27,3 +28,4 @@ exclude_patterns = []
 html_theme = "sphinx_rtd_theme"
 html_static_path = ['_static']
 html_css_files = ['custom.css',]
+
