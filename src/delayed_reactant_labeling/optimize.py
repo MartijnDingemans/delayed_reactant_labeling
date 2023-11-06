@@ -2,22 +2,20 @@ from __future__ import annotations
 
 import os
 import warnings
+from abc import ABC, abstractmethod
+from copy import deepcopy
+from datetime import datetime
+from math import log
+from random import random
+from typing import Optional, Callable
 
 import numpy as np
 import pandas as pd  # used for storage of the data, its series objects are much more powerful.
-
-from abc import ABC, abstractmethod
-from datetime import datetime
-from typing import Optional, Callable
-from copy import deepcopy
-
-from joblib import Parallel, delayed
-from scipy.optimize import minimize
-from tqdm import tqdm
-from random import random
-from math import log
-
 from delayed_reactant_labeling.predict import InvalidPredictionError
+from delayed_reactant_labeling.optimize_nelder_mead import minimize_neldermead
+from joblib import Parallel, delayed
+from scipy.optimize import Bounds
+from tqdm import tqdm
 
 
 class JSON_log:
@@ -98,7 +96,8 @@ class RateConstantOptimizerTemplate(ABC):
         nan_warnings = []  #
         for curve_description, curve in self.experimental_curves.items():
             if np.isnan(curve).any():
-                nan_warnings.append(f"Experimental data curve for {curve_description} contains {np.isnan(curve).sum()} NaN values.")
+                nan_warnings.append(
+                    f"Experimental data curve for {curve_description} contains {np.isnan(curve).sum()} NaN values.")
 
         if nan_warnings:
             warnings.warn("\n".join(nan_warnings))
@@ -176,7 +175,7 @@ class RateConstantOptimizerTemplate(ABC):
     def optimize(self,
                  x0: np.ndarray,
                  x_description: list[str],
-                 x_bounds: list[tuple[float, float]],
+                 x_bounds: Bounds,
                  path: str,
                  metadata: Optional[dict] = None,
                  maxiter: float = 50000,
@@ -189,7 +188,7 @@ class RateConstantOptimizerTemplate(ABC):
         Optimizes the system, utilizing a nelder-mead algorithm.
         :param x0: Parameters which are to be optimized. Always contain the rate constants.
         :param x_description: Description of each parameter.
-        :param x_bounds: A list containing tuples, which in turn contain the lower and upper bound for each parameter.
+        :param x_bounds: The scipy.optimize.bounds of each parameter.
         :param path: Where the solution should be stored.
         :param metadata: The metadata that should be saved alongside the solution.
         :param maxiter: The maximum number of iterations.
@@ -240,21 +239,23 @@ class RateConstantOptimizerTemplate(ABC):
 
                 with tqdm(total=maxiter, miniters=25, **tqdm_kwargs) as pbar:
                     # the minimization process is stored within the log, containing all x's and errors.
-                    minimize(fun=optimization_step,
-                             x0=x0,
-                             method="Nelder-Mead",
-                             bounds=x_bounds,
-                             callback=update_tqdm,
-                             options={"maxiter": maxiter, "disp": True, "adaptive": True, "return_all": False,
-                                      "initial_simplex": resume_from_simplex})
+                    minimize_neldermead(
+                        func=optimization_step,
+                        x0=x0,
+                        bounds=x_bounds,
+                        callback=update_tqdm,
+                        maxiter=maxiter,
+                        adaptive=True,
+                        initial_simplex=resume_from_simplex)
             else:
                 # the minimization process is stored within the log, containing all x's and errors.
-                minimize(fun=optimization_step,
-                         x0=x0,
-                         method="Nelder-Mead",
-                         bounds=x_bounds,
-                         options={"maxiter": maxiter, "disp": True, "adaptive": True, "return_all": False,
-                                  "initial_simplex": resume_from_simplex})
+                minimize_neldermead(
+                    func=optimization_step,
+                    x0=x0,
+                    bounds=x_bounds,
+                    maxiter=maxiter,
+                    adaptive=True,
+                    initial_simplex=resume_from_simplex)
         except Exception as e:
             logger.log(pd.Series({'MAE': np.nan, 'exception': e}))
             raise e
@@ -263,10 +264,11 @@ class RateConstantOptimizerTemplate(ABC):
                           path: str,
                           n_runs: int,
                           x_description: list[str],
-                          x_bounds: list[tuple[float, float]],
+                          x_bounds: Bounds,
                           x0_bounds: Optional[list[tuple[float, float]]] = None,
                           x0_min: float = 1e-6,
                           n_jobs: int = 1,
+                          backend: str = "loky",
                           **optimize_kwargs):
         """
         Optimizes the system, utilizing a nelder-mead algorithm, for a given number of runs. Each run has random
@@ -277,13 +279,14 @@ class RateConstantOptimizerTemplate(ABC):
         :param path: Where the solution should be stored.
         :param n_runs: The number of runs which are to be computed.
         :param x_description: Description of each parameter.
-        :param x_bounds: A list containing tuples, containing the lower and upper boundaries for each parameter.
+        :param x_bounds: scipy.optimize.Bounds of each parameter.
         :param x0_bounds: A list containing tuples, containing the lower and upper boundaries for the starting value of
             each parameter. By default, it is identical to the x_bounds. Lower bounds smaller than x0_min are set to x0_min.
             When the upper bound is 0, the corresponding x0 will also be set to 0. This disables the reaction.
         :param x0_min: The minimum value the lower bound of x0_bounds can take. Any values lower than it is set to
             x0_min.
         :param n_jobs: The number of processes which should be used, if -1, all available cores are used.
+        :param backend: The backend that is used by Joblib. Loky (default) works on all platforms.
         :param optimize_kwargs: The key word arguments that will be passed to self.optimize.
         """
         try:
@@ -295,11 +298,11 @@ class RateConstantOptimizerTemplate(ABC):
                           f"Appending results instead starting with seed {start_seed}")
 
         if x0_bounds is None:
-            x0_bounds = deepcopy(x_bounds)
+            x0_bounds = [(lb, ub) for lb, ub in zip(x_bounds.lb, x_bounds.ub)]
 
         x0_bounds = [(lb, ub,) if lb > x0_min else (x0_min, ub) for lb, ub in x0_bounds]
 
-        Parallel(n_jobs=n_jobs, verbose=100, backend="loky")(
+        Parallel(n_jobs=n_jobs, verbose=100, backend=backend)(
             delayed(self._mp_work_list)(
                 seed=seed,
                 x_description=x_description,
@@ -329,7 +332,8 @@ class RateConstantOptimizerTemplate(ABC):
                 pbar_show=False,
                 **optimize_kwargs
             )
-        except InvalidPredictionError:
+        except InvalidPredictionError as e:
+            warnings.warn(f"Invalid prediction was found at seed: {seed}: \n{e}")
             pass  # results are stored incase an error occurred due to self.optimize.
 
     @staticmethod
