@@ -300,7 +300,7 @@ class RateConstantOptimizerTemplate(ABC):
         x0_bounds = [(lb, ub,) if lb > x0_min else (x0_min, ub) for lb, ub in x0_bounds]
 
         Parallel(n_jobs=n_jobs, verbose=100, backend=backend)(
-            delayed(self._mp_work_list)(
+            delayed(self.optimize_random_guess)(
                 seed=seed,
                 x_description=x_description,
                 x_bounds=x_bounds,
@@ -311,7 +311,7 @@ class RateConstantOptimizerTemplate(ABC):
             for seed in range(start_seed, start_seed + n_runs)
         )
 
-    def _mp_work_list(self, seed, x_description, x_bounds, x0_bounds, path, optimize_kwargs):
+    def optimize_random_guess(self, seed, x_description, x_bounds, x0_bounds, path, optimize_kwargs):
         # log uniform from scipy is not supported in 1.3.3
         def loguniform(lo, hi):
             return lo ** ((((log(hi) / log(lo)) - 1) * random()) + 1)
