@@ -20,6 +20,7 @@ To create a prediction of the concentration of each chemical as a function of ti
 Contents
 --------
 .. toctree::
+   :maxdepth: 3
 
    installation
    predict
