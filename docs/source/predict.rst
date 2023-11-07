@@ -15,7 +15,8 @@ class implements methods to:
     :param reactions: The reactions that describe the system. Each tuple exist out of the name of the rate constant,
         a list of reactants, and a list of products.
     :type reactions: list[tuple[str, list[str], list[str]]]
-    :param rate_constants: A dictionary which maps the rate constants to their respective values.
+    :param rate_constants: A dictionary which maps the rate constants to their respective values. Reactions which have
+        a rate constants equal to 0, will be removed from the model.
     :type rate_constants: dict[str: float]
     :param output_order: Defines in which column the concentration of each chemical will be stored.
             By default, it is alphabetical.
