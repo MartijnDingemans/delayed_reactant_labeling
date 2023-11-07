@@ -73,17 +73,22 @@ class OptimizerProgress:
 
 class RateConstantOptimizerTemplate(ABC):
     def __init__(self,
-                 raw_weights: dict[str, float],
                  experimental: pd.DataFrame,
-                 metric: Callable[[np.ndarray, np.ndarray], float]) -> None:
+                 metric: Callable[[np.ndarray, np.ndarray], float],
+                 raw_weights: Optional[dict[str, float]] = None,) -> None:
         """
         Initializes the Rate constant optimizer class.
-        :param raw_weights: Dictionary containing str patterns as keys and the weight as values.
-        The str patterns will be searched for in the keys of the results from the 'calculate_curves' function.
-        The given weight will lower corresponding errors.
         :param experimental: Pandas dataframe containing the experimental data.
-        :param metric: The error metric which should be used. It must implement y_true and y_pred as its arguments.
+        :param metric: The error metric which should be used.
+            It must implement y_true and y_pred as its arguments.
+        :param raw_weights: Dictionary containing str patterns as keys and the weight as values.
+            The str patterns will be searched for in the keys of the results from the 'calculate_curves' function.
+            The given weight will lower corresponding errors.
+            If None (default), no weights will be applied
         """
+        if raw_weights is None:
+            raw_weights = {}
+
         self.raw_weights = raw_weights
         self.weights = None
 
@@ -107,7 +112,7 @@ class RateConstantOptimizerTemplate(ABC):
         """
         Create a prediction of the system, given a set of parameters.
         :param x: Contains all parameters, which are to be optimized.
-        Definitely includes are rate constants.
+        Definitely included are all rate constants.
         :param x_description: Contains a description of each parameter.
         :return: Predicted values of the concentration for each chemical, as a function of time.
         """
@@ -217,7 +222,7 @@ class RateConstantOptimizerTemplate(ABC):
         else:
             logger = JSON_log(log_path, mode="append")
 
-        def optimization_step(x):
+        def optimization_step(x: np.ndarray):
             """The function is given a set of parameters by the Nelder-Mead algorithm.
             Proceeds to calculate the corresponding prediction and its total error.
             The results are stored in a log before the error is returned to the optimizer."""
