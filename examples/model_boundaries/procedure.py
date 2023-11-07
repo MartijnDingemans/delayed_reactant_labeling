@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-import os
 import warnings
+import zipfile
+import pathlib
+import shutil
 
 import matplotlib
 import matplotlib.pyplot as plt
-matplotlib.use('Agg')
+matplotlib.use('Agg')  # when committing to the server, this is essential!
 
 import numpy as np
 import pandas as pd
@@ -14,8 +16,8 @@ from scipy.optimize import Bounds
 from delayed_reactant_labeling.predict import DRL
 from delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate
 
-USE_NOISE = True
-USE_TIC = True
+USE_NOISE = False
+USE_TIC = False
 warnings.warn(f"TIC: {USE_TIC}, NOISE {USE_NOISE}")  # warnings.warn so its shows up in the log easily
 
 reactions = [
@@ -78,9 +80,16 @@ def METRIC(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     return np.average(np.abs(y_pred - y_true), axis=0)
 
 
+def to_zip(directory: pathlib.Path):
+    with zipfile.ZipFile(f'{directory}.zip', mode='x') as archive:
+        for file_path in directory.rglob("*"):
+            archive.write(file_path, arcname=file_path.relative_to(directory))
+    shutil.rmtree(directory)
+
+
 def explore_boundary(path, k1, kr1, k2, noise_func):
-    path = f'{path}/k1_{k1}_kr1_{kr1}_k2_{k2}/'
-    os.mkdir(path)
+    path = pathlib.Path(f'{path}/k1_{k1}_kr1_{kr1}_k2_{k2}/')
+    path.mkdir(exist_ok=True, parents=True)
 
     # "real" fake data
     rate_constants_real = {'k1': k1, 'k-1': kr1, 'k2': k2}
@@ -129,6 +138,7 @@ def explore_boundary(path, k1, kr1, k2, noise_func):
     RCO.optimize_multiple(path=f'{path}/multiple_guess/', n_runs=1000, x_bounds=x_bounds,
                           x_description=dimension_description, n_jobs=-1,
                           metadata={"USE_NOISE": USE_NOISE, "USE_TIC": USE_TIC})
+    to_zip(path)  # individual files take up at least 1 Mb at the server, -> zipping reduces size load drastically.
 
 
 def noisify(rng: np.random.Generator, arr: np.ndarray) -> np.ndarray:
