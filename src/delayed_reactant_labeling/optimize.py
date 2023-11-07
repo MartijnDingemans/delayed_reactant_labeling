@@ -262,7 +262,7 @@ class RateConstantOptimizerTemplate(ABC):
                           n_runs: int,
                           x_description: list[str],
                           x_bounds: Bounds,
-                          x0_bounds: Optional[list[tuple[float, float]]] = None,
+                          x0_bounds: Optional[Bounds] = None,
                           x0_min: float = 1e-6,
                           n_jobs: int = 1,
                           backend: str = "loky",
@@ -295,9 +295,9 @@ class RateConstantOptimizerTemplate(ABC):
                           f"Appending results instead starting with seed {start_seed}")
 
         if x0_bounds is None:
-            x0_bounds = [(lb, ub) for lb, ub in zip(x_bounds.lb, x_bounds.ub)]
+            x0_bounds = x_bounds
 
-        x0_bounds = [(lb, ub,) if lb > x0_min else (x0_min, ub) for lb, ub in x0_bounds]
+        x0_bounds = [(lb, ub,) if lb > x0_min else (x0_min, ub) for lb, ub in zip(x0_bounds.lb, x0_bounds.ub)]
 
         Parallel(n_jobs=n_jobs, verbose=100, backend=backend)(
             delayed(self.optimize_random_guess)(
