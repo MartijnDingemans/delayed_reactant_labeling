@@ -3,6 +3,8 @@ Implementation details
 For both the predict and optimize modules it was essential to make the code as efficient as possible, while remaining
 robust.
 
+.. _rate_equations:
+
 Rate equations
 --------------
 To be able to calculate the rate of change per chemical as a function of the current concentrations in the system,
@@ -53,8 +55,6 @@ The :func:`predict.DRL.predict_concentration` function returns polars.DataFrames
 turned out to be alot more efficient to calculate the DRL curves and errors with. However, pandas series are more
 convenient to print, and manipulate, as they behave more like dictionaries. Furthermore pandas objects give more
 flexibility to store the data as JSON files. This is why two different dataframe libraries are used simultaneously.
-
-.. _rate_equations:
 
 Explict Euler formula
 ---------------------

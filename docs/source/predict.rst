@@ -5,89 +5,17 @@ system. When the prediction fails it raises a :exc:`InvalidPredictionError <pred
 class implements methods to:
 
 #. :meth:`Predict the concentrations<predict.DRL.predict_concentration>` for a DRL experiment using the ODE solver (preferred).
-#. Calculate the :ref:`change<rate_equations>`  in chemical concentration as a function of the current concentrations.
-#. Calculate the :ref:`Jacobian matrix<Jacobian>` , which is required by the ODE solver. This **only** works for reaction where each reaction step is first order in each chemical.
 #. Predict the concentrations for a DRL experiment using the explicit Euler formula (discouraged).
+#. Calculate the change  in chemical concentration as a function of the current concentrations.
+#. Calculate the Jacobian, which is required by the ODE solver. This **only** works for reaction where each reaction step is first order in each chemical.
+
+The details how the :ref:`rate equations<rate_equations>` and :ref:`Jacobian matrix<Jacobian>` are calculated can be
+found in the implementation details section.
 
 .. py:currentmodule:: predict
-.. class:: DRL(reactions, rate_constants, output_order=None, verbose=False)
 
-    :param reactions: The reactions that describe the system. Each tuple exist out of the name of the rate constant,
-        a list of reactants, and a list of products.
-    :type reactions: list[tuple[str, list[str], list[str]]]
-    :param rate_constants: A dictionary which maps the rate constants to their respective values. Reactions which have
-        a rate constants equal to 0, will be removed from the model.
-    :type rate_constants: dict[str: float]
-    :param output_order: Defines in which column the concentration of each chemical will be stored.
-            By default, it is alphabetical.
-    :type output_order: list[str]
-    :param verbose: If True, it will print and store information on which reactions are initialized.
-    :type verbose: bool
-
-    :ivar reactions_overview: A comprehensive overview of the reactions that will be calculated
-        if the verbose argument was True upon initialization.
-
-    .. method:: predict_concentration(t_eval_pre, t_eval_post, initial_concentrations, labeled_concentrations, dilution_factor, atol=1e-10, rtol=1e-10)
-
-        Predicts the concentrations during a DRL experiment. After evaluating all timestamp in t_eval_pre it 'dilutes'
-        the prediction and sets the concentration of labeled compound. Subsequently the t_eval_post time stamps are
-        evaluated. It utilizes the ODE solver 'scipy.integrate.solve_ivp' with the Radau method. Negative concentrations
-        might occur within the range of the tolerances given.
-
-        :param t_eval_pre: The time steps that must be evaluated and returned before the addition of the labeled compound.
-        :param t_eval_post:  The time steps that must be evaluated and returned after the addition of the labeled compound.
-        :param initial_concentrations: The initial concentrations of each chemical. Non-zero concentrations are not required.
-        :param labeled_concentration: The concentration of the labeled chemical. Non-zero concentrations are not required. This concentration is not diluted.
-        :param dilution_factor: The factor (≤1) by which the prediction will be multiplied when the labeled chemical is added.
-            This simulates the dilution upon addition of solvent.
-        :param atol: The absolute tolerances for the ODE solver.
-        :param rtol: The relative tolerances for the ODE solver.
-
-        :type t_eval_pre: np.ndarray
-        :type t_eval_post:  np.ndarray
-        :type initial_concentrations: dict[str: float]
-        :type labeled_concentration: dict[str: float]
-        :type dilution_factor: float
-        :type atol: float
-        :type rtol: float
-
-        :raise InvalidPredictionError: If negative concentration larger than the maximum tolerance, or NaN values, are detected in the output.
-        :return: Predictions of the concentrations pre-, and post-addition of the labeled compound.
-        :rtype: tuple[polars.DataFrame, polars.DataFrame]
-
-    .. method:: predict_concentration_Euler(experimental_conditions, steps_per_step=1)
-
-        Predicts the concentrations during a DRL experiment. After evaluating all timestamp in t_eval_pre it 'dilutes'
-        the prediction and sets the concentration of labeled compound. Subsequently the t_eval_post time stamps are
-        evaluated. It implements the explicit Euler formula. More steps in between each evaluated point in the t_eval
-        arrays can be added to increase the accuracy.
-
-        :param t_eval_pre: The time steps that must be evaluated and returned before the addition of the labeled compound.
-        :param t_eval_post:  The time steps that must be evaluated and returned after the addition of the labeled compound.
-        :param initial_concentrations: The initial concentrations of each chemical. Non-zero concentrations are not required.
-        :param labeled_concentration: The concentration of the labeled chemical. Non-zero concentrations are not required. This concentration is not diluted.
-        :param dilution_factor: The factor (≤1) by which the prediction will be multiplied when the labeled chemical is added.
-            This simulates the dilution upon addition of solvent.
-        :param steps_per_step: The number of steps to simulate per step of the t_eval array. Higher values yield higher
-            accuracy at the cost of computation time.
-
-        :type t_eval_pre: np.ndarray
-        :type t_eval_post:  np.ndarray
-        :type initial_concentrations: dict[str: float]
-        :type labeled_concentration: dict[str: float]
-        :type dilution_factor: float
-        :type steps_per_step: int
-
-        :raise InvalidPredictionError: If negative concentration larger than the maximum tolerance, or NaN values, are detected in the output.
-        :return: Predictions of the concentrations pre-, and post-addition of the labeled compound.
-        :rtype: tuple[polars.DataFrame, polars.DataFrame]
-
-
-.. exception:: InvalidPredictionError
-
-    Raised when NaN values or values more negative than the tolerance are found.
-    For debugging purposes the error also contains the rate constants which were used when the error occurred.
-
+.. autoclass:: DRL
+    :members:
 
 example
 -------
