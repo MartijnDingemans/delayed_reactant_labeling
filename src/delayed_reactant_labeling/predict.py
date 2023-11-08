@@ -52,10 +52,10 @@ def _calculate_steps_euler(reaction_rate: np.ndarray,
 
 
 @njit
-def dc_dt(concentrations: np.ndarray,
-          reaction_rates: np.ndarray,
-          reaction_reactants: List[np.ndarray],
-          reaction_products: List[np.ndarray]):
+def _dc_dt(concentrations: np.ndarray,
+           reaction_rates: np.ndarray,
+           reaction_reactants: List[np.ndarray],
+           reaction_products: List[np.ndarray]):
     """
     Calculates the rate of change for each chemical as a function of time
     :param concentrations: The last known concentration of each chemical.
@@ -63,12 +63,12 @@ def dc_dt(concentrations: np.ndarray,
     :param reaction_reactants: The indices of the reactants in each reaction.
     :param reaction_products: The indices of the products in each reaction.
     """
-    _dc_dt = np.zeros(concentrations.shape)
+    dc_dt = np.zeros(concentrations.shape)
     for i in range(reaction_rates.shape[0]):
         created_amount = reaction_rates[i] * np.prod(concentrations[reaction_reactants[i]])
-        _dc_dt[reaction_reactants[i]] -= created_amount  # consumed
-        _dc_dt[reaction_products[i]] += created_amount  # produced
-    return _dc_dt
+        dc_dt[reaction_reactants[i]] -= created_amount  # consumed
+        dc_dt[reaction_products[i]] += created_amount  # produced
+    return dc_dt
 
 
 @njit
@@ -106,33 +106,47 @@ def _calculate_jac(concentrations: np.ndarray,
 
 
 class DRL:
-    """Class which enables efficient prediction of changes in concentration in a chemical system.
-    Especially useful for Delayed Reactant Labeling (DRL) experiments."""
+    """Analyzes a chemical system to be able to predict its concentrations over time.
+
+    Parameters
+    ----------
+    reactions
+        A list of each reaction step that describes the total system.
+        Each reaction step is a tuple, where the first element is the name of the rate constant.
+        The second element contains a list with the names of each reactant.
+        The third element contains a list with the names of each product.
+    rate_constants
+        The rate constants and their respective values.
+    output_order
+        The index of the initial concentrations and prediction.
+        The order of each chemical must be given.
+        If None (default), the order will be alphabetical.
+    verbose
+        If true, it will print store information on the reactions in the model.
+        This information is also stored as the attribute 'reactions_overview'.
+
+    Attributes
+    ----------
+    reactions_overview : pd.DataFrame
+        If verbose was True upon initialization, this will yield an easier to read overview of the reactions
+        in the system. It also shows the value of each rate constant, and not only its name.
+    """
 
     def __init__(self,
                  reactions: list[tuple[str, list[str], list[str]]],
                  rate_constants: dict[str, float] | pd.Series,
                  output_order: list[str] = None,
                  verbose: bool = False):
-        """
-        Initialize the chemical system.
-        :param reactions: List of reactions, each reaction is given as a tuple.
-        Its first element is a string, which determines which rate constant is applicable to that reaction.
-        Its second element is a list containing the identifiers (strings) of each reactant in the reaction.
-        The third element contains a list for the reaction products
-        :param rate_constants: A dictionary which maps the rate constants to their respective values.
-        :param output_order: Defines in which column the concentration of each chemical will be stored.
-            By default, it is alphabetical.
-        :param verbose: If True, it will print and store information on which reactions are initialized.
-        """
+        """Initialize the chemical system."""
+
         if verbose:
             # Pandas is much more flexible when it comes to storing data. Especially lists in lists.
             df = []
             for k, reactants, products in reactions:
                 df.append(pd.Series([k, rate_constants[k], reactants, products],
                                     index=['k', 'k-value', 'reactants', 'products']))
-            self.reactions = pd.DataFrame(df)
-            print(self.reactions)
+            self.reactions_overview = pd.DataFrame(df)
+            print(self.reactions_overview)
 
         # The rate constants that were inputted will be shown if an error occurs. Allows for easier debugging.
         self.rate_constants_input = pd.Series(rate_constants)
@@ -165,22 +179,6 @@ class DRL:
             self.reaction_products.append(np.array([self.reference[product] for product in products]))
         self.reaction_rate = np.array(self.reaction_rate)
 
-    def calculate_step(self, _, y):
-        """
-        Wrapper around dc_dt() to fix the arguments.
-        :param _: Time is inputted here by scipy.integrate.
-        :param y: Concentrations
-        """
-        return dc_dt(y, self.reaction_rate, self.reaction_reactants, self.reaction_products)
-
-    def calculate_jac(self, _, y):
-        """
-        Wrapper around dc_dt() to fix the arguments.
-        :param _: Time is inputted here by scipy.integrate.
-        :param y: Concentrations
-        """
-        return _calculate_jac(y, self.reaction_rate, self.reaction_reactants, self.reaction_products)
-
     def predict_concentration(self,
                               t_eval_pre: np.ndarray,
                               t_eval_post: np.ndarray,
@@ -189,16 +187,32 @@ class DRL:
                               dilution_factor: float,
                               atol: float = 1e-10,
                               rtol: float = 1e-10) -> pd.DataFrame:
-        """
-        Predicts the concentrations during a DRL experiment.
+        """Predicts the concentrations during a DRL experiment.
         It utilizes the ODE solver 'scipy.integrate.solve_ivp' with the Radau method.
-        :param t_eval_pre: The time steps that must be evaluated and returned before the addition of the labeled compound.
-        :param t_eval_post:  The time steps that must be evaluated and returned after the addition of the labeled compound.
-        :param initial_concentrations: The initial concentrations of each chemical. Non-zero concentrations are not required.
-        :param labeled_concentration: The concentration of the labeled chemical. This concentration is not diluted.
-        :param dilution_factor: The factor (<1) by which the prediction will be 'diluted' when the labeled chemical is added.
-        :param atol: The absolute tolerances for the ODE solver.
-        :param rtol: The relative tolerances for the ODE solver.
+
+        Args
+        ----
+        t_eval_pre
+            The time steps, that must be evaluated, before the addition of the labeled compound.
+        t_eval_post
+            The time steps, that must be evaluated and returned, after the addition of the labeled compound.
+        initial_concentrations
+            The initial concentrations of each chemical.
+            Non-zero concentrations are not required.
+        labeled_concentration
+            The concentration of the labeled chemical.
+            This concentration is not diluted.
+        dilution_factor
+            The factor (<= 1) by which the prediction will be 'diluted' when the labeled chemical is added.
+        atol
+            The absolute tolerances for the ODE solver.
+        rtol
+            The relative tolerances for the ODE solver.
+
+        Returns
+        -------
+        pd.DataFrame
+            The prediction of the concentration as a function of time after the addition of the labeled compound.
         """
         # modify the stored initial concentration to match with input.
         for chemical, initial_concentration in initial_concentrations.items():
@@ -275,14 +289,34 @@ class DRL:
                                     labeled_concentration: dict[str, float],
                                     dilution_factor: float,
                                     steps_per_step=1):
-        """
-        Predicts the concentrations during a DRL experiment.
-        :param t_eval_pre: The time steps that must be evaluated and returned before the addition of the labeled compound.
-        :param t_eval_post:  The time steps that must be evaluated and returned after the addition of the labeled compound.
-        :param initial_concentrations: The initial concentrations of each chemical. Non-zero concentrations are not required.
-        :param labeled_concentration: The concentration of the labeled chemical. This concentration is not diluted.
-        :param dilution_factor: The factor (<1) by which the prediction will be 'diluted' when the labeled chemical is added.
-        :param steps_per_step: The number of steps to simulate inbetween each step in the time slice.
+        """Predicts the concentrations during a DRL experiment.
+
+        Warning
+        -------
+        It is less accurate and slower compared to using an ODE solver such as implemented
+        by :meth:`predict_concentration`.
+
+        Args
+        ----
+        t_eval_pre
+            The time steps, that must be evaluated, before the addition of the labeled compound.
+        t_eval_post
+            The time steps, that must be evaluated and returned, after the addition of the labeled compound.
+        initial_concentrations
+            The initial concentrations of each chemical.
+            Non-zero concentrations are not required.
+        labeled_concentration
+            The concentration of the labeled chemical.
+            This concentration is not diluted.
+        dilution_factor
+            The factor (<= 1) by which the prediction will be 'diluted' when the labeled chemical is added.
+        steps_per_step
+            The number of steps
+            that should be modeled for each point that is evaluated according to the t_eval arrays.
+        Returns
+        -------
+        pd.DataFrame
+            The prediction of the concentration as a function of time after the addition of the labeled compound.
         """
         # modify the stored initial concentration to match with input.
         for chemical, initial_concentration in initial_concentrations.items():
@@ -322,3 +356,41 @@ class DRL:
             )
 
         return results_post_addition
+
+    def calculate_step(self, _: np.ndarray, y: np.ndarray) -> np.ndarray:
+        """Calculates the rate of change in the chemical system.
+
+        Args
+        ----
+        _
+            Time is inputted here by scipy.integrate.solve_ivp,
+            but it is not used to calculate the rate of change.
+        y
+            The current concentrations of each chemical.
+
+        Returns
+        -------
+        np.ndarray
+            The change in concentration with respect to time.
+            This has NOT been multiplied with the change in time yet!
+
+        """
+        return _dc_dt(y, self.reaction_rate, self.reaction_reactants, self.reaction_products)
+
+    def calculate_jac(self, _, y):
+        """Calculates the Jacobian for the chemical system.
+
+        Args
+        ----
+        _
+            Time is inputted here by scipy.integrate.solve_ivp,
+            but it is not used to calculate the Jacobian.
+        y
+            The current concentrations of each chemical.
+
+        Returns
+        -------
+        np.ndarray
+            The Jacobian.
+        """
+        return _calculate_jac(y, self.reaction_rate, self.reaction_reactants, self.reaction_products)

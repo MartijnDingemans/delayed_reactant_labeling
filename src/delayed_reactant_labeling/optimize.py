@@ -46,10 +46,40 @@ class JSON_log:
 
 
 class OptimizerProgress:
+    """Formatted data structure of an optimized model.
+
+    Parameters
+    ----------
+    path
+        The path to the folder where the optimization progress has been stored.
+
+    Attributes
+    ----------
+    metadata : dict[str, any]
+        The stored metadata.
+    x_description : list[str]
+        The description of each parameter.
+    n_dimensions : int
+        The number of parameters.
+    n_iterations : int
+        The number of computed iterations.
+    all_X : pd.DataFrame
+        The applied parameters for each iteration.
+    all_errors : pd.Series
+        The error for each iteration.
+    all_times : pd.Series
+        The timestamp at which the computation of each iteration was finished.
+    best_X : pd.Series
+        The parameters for the iteration with the lowest error.
+    best_error : float
+        The error corresponding to the iteration with the lowest error.
+    simplex : np.ndarray
+        An array of size [N + 1, N] corresponding to the N parameters for each of the N + 1 best iterations
+    """
     def __init__(self, path: str):
         # read the meta data
-        self.metadata = pd.read_json(f"{path}/settings_info.json", lines=True).iloc[0, :]
-        self.x_description = np.array(self.metadata["x_description"])
+        self.metadata: dict[str, any] = pd.read_json(f"{path}/settings_info.json", lines=True).iloc[0, :]
+        self.x_description = list(self.metadata["x_description"])
 
         # read the optimization log
         df = pd.read_json(f"{path}/optimization_log.json", lines=True)
@@ -63,7 +93,8 @@ class OptimizerProgress:
         simplex = np.full((self.n_dimensions + 1, self.n_dimensions), np.nan)
         sorted_errors = self.all_errors.sort_values(ascending=True)
         for n, index in enumerate(sorted_errors[:self.n_dimensions + 1].keys()):
-            simplex[n, :] = self.all_X.iloc[index, :].to_numpy()  # underscored variant so that no copying is required
+            simplex[n, :] = self.all_X.iloc[index, :].to_numpy()
+        self.simplex = simplex
 
         best_iteration_index = sorted_errors.index[0]
 
@@ -72,25 +103,42 @@ class OptimizerProgress:
 
 
 class RateConstantOptimizerTemplate(ABC):
+    """Enables easy optimization of a model, which must be semi-implemented by the user.
+
+    Note
+    ----
+    The user must implement the following abstract functions:
+
+    1.  :meth:`create_prediction`
+    2.  :meth:`calculate_curves`
+
+    Parameters
+    ------
+    experimental
+        The experimental data
+    metric
+        An error metric which takes as input two np.ndarrays for the keywords ``y_pred`` and ``y_true``
+        and returns a float. Lower values should indicate a better prediction.
+    raw_weights
+        A dictionary containing patterns and weight. Each pattern will be searched for in the errors.
+        Upon a match the error yielded will be multiplied by its respective weight. If an error is matched with multiple
+        patterns, the weight will be decreased in a multiplicative manner. If None (default), no weights will be applied.
+
+    Attributes
+    ----------
+    weights : Optional[np.ndarray]
+        The final weight per error type.
+    """
     def __init__(self,
                  experimental: pd.DataFrame,
                  metric: Callable[[np.ndarray, np.ndarray], float],
                  raw_weights: Optional[dict[str, float]] = None,) -> None:
-        """
-        Initializes the Rate constant optimizer class.
-        :param experimental: Pandas dataframe containing the experimental data.
-        :param metric: The error metric which should be used.
-            It must implement y_true and y_pred as its arguments.
-        :param raw_weights: Dictionary containing str patterns as keys and the weight as values.
-            The str patterns will be searched for in the keys of the results from the 'calculate_curves' function.
-            The given weight will lower corresponding errors.
-            If None (default), no weights will be applied
-        """
+
         if raw_weights is None:
             raw_weights = {}
 
         self.raw_weights = raw_weights
-        self.weights = None
+        self.weights: Optional[np.ndarray] = None
 
         # initialize all curves for the experimental (true) values.
         self.experimental_curves = self.calculate_curves(experimental)
@@ -109,31 +157,59 @@ class RateConstantOptimizerTemplate(ABC):
     @staticmethod
     @abstractmethod
     def create_prediction(x: np.ndarray, x_description: list[str]) -> pd.DataFrame:
-        """
-        Create a prediction of the system, given a set of parameters.
-        :param x: Contains all parameters, which are to be optimized.
-        Definitely included are all rate constants.
-        :param x_description: Contains a description of each parameter.
-        :return: Predicted values of the concentration for each chemical, as a function of time.
+        """Creates a prediction of the system, given a set of parameters.
+        For DRL experiments :meth:`DRL.predict_concentration <predict.DRL.predict_concentration>`
+        does most of the required calculations.
+
+        Args
+        ----
+        x
+            Contains all parameters, which are to be optimized.
+        x_description
+            The description of each parameter.
+
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame that contains the predicted concentrations as a function of time.
         """
         pass
 
     @staticmethod
     @abstractmethod
     def calculate_curves(data: pd.DataFrame) -> dict[str, np.ndarray]:
-        """
-        Calculate the curves corresponding to the data (either experimental or predicted).
-        The experimental curves will only be calculated once and are stored for subsequent use.
-        Internally, the experimental and predicted curves will be compared against each other to determine the error.
-        :param data: The data from which the curves should be calculated
-        :return: dict containing a description of each curve, and the corresponding curve.
+        """Calculates the curves corresponding to the data (either experimental or predicted).
+        The experimental curves will only be calculated upon initialization and are stored for subsequent use.
+
+        Args
+        ----
+        data
+            The data from which the curves should be calculated. Either experimental or predicted by :meth:`create_prediction`.
+
+        Returns
+        -------
+        dict[str, np.ndarray]
+            A dictionary containing a description of each curve, and the corresponding curve.
         """
 
     def calculate_errors(self, prediction: pd.DataFrame) -> pd.Series:
-        """
-        Calculate the error caused by each error function.
-        :param prediction: Pandas dataframe containing the predicted concentrations.
-        :return: Pandas.Series containing the unweighted errors of each error function.
+        """Calculates the (unweighted) error caused by each error function.
+
+        Args
+        ----
+        prediction
+            The predicted concentrations as a function of time
+
+        Returns
+        -------
+        pd.Series
+            The unweighted errors of each error function.
+
+        Raises
+        ------
+        ValueError
+            When the metric returns a nan value, a ValueError will be raised. The error message will detail information
+            on which curves caused the metric to return nan.
         """
         curves_predicted = self.calculate_curves(prediction)
         error = {}
@@ -151,12 +227,18 @@ class RateConstantOptimizerTemplate(ABC):
         return pd.Series(error)
 
     def weigh_errors(self, errors: pd.Series, ) -> pd.Series:
+        """Weighs the errors.
+
+        Args
+        ----
+        errors
+            The unweighted errors
+
+        Returns
+        -------
+        pd.Series
+            The weighed errors
         """
-        weighs the errors
-        :param errors: unweighted errors
-        :return: weighed errors
-        """
-        # assert isinstance(errors, pl.Series)
         if self.weights is None:
             weights = np.ones(errors.shape)
             for description, weight in self.raw_weights.items():
@@ -169,10 +251,17 @@ class RateConstantOptimizerTemplate(ABC):
         return errors * self.weights
 
     def calculate_total_error(self, errors: pd.Series) -> float:
-        """
-        weighs and sums the errors.
-        :param errors: unweighted errors
-        :return: weighed total error
+        """Weighs and sums the errors. NaN values are not skipped.
+
+        Args
+        ----
+        errors
+            The unweighted errors
+
+        Returns
+        -------
+        float
+            The total error in the model.
         """
         return self.weigh_errors(errors).sum(skipna=False)
 
@@ -183,22 +272,40 @@ class RateConstantOptimizerTemplate(ABC):
                  path: str,
                  metadata: Optional[dict] = None,
                  maxiter: float = 50000,
-                 resume_from_simplex=None,
-                 show_pbar=True,
-                 _overwrite_log=False,
+                 resume_from_simplex: np.ndarray=None,
+                 show_pbar: bool=True,
+                 _overwrite_log: bool=False,
                  ) -> None:
-        """
-        Optimizes the system, utilizing a nelder-mead algorithm.
-        :param x0: Parameters which are to be optimized. Always contain the rate constants.
-        :param x_description: Description of each parameter.
-        :param x_bounds: The scipy.optimize.bounds of each parameter.
-        :param path: Where the solution should be stored.
-        :param metadata: The metadata that should be saved alongside the solution.
-        :param maxiter: The maximum number of iterations.
-        :param resume_from_simplex: When a simplex is given, the solution starts here.
-        :param show_pbar: If True, shows a progress bar.
-        :param _overwrite_log: If True, the logs will be overwritten.
+        """Optimizes the system, utilizing a nelder-mead algorithm.
+
+        Args
+        ----
+        x0
+            Parameters which are to be optimized. Always contain the rate constants.
+        x_description
+            Description of each parameter.
+        x_bounds
+            The scipy.optimize.bounds of each parameter.
+        path
+            The path to the folder where the optimization progress should be stored.
+        metadata
+            The metadata that should be saved alongside the solution.
+            This data will be stored in the settings_info.json file.
+        maxiter
+            The maximum number of iterations.
+        resume_from_simplex
+            When a simplex is given of size [N+1, N] where N is the number of parameters, the solution starts here.
+            This can be used to resume the optimization process.
+        show_pbar
+            If True, shows a progress bar.
+        _overwrite_log
+            If True, the logs will be overwritten.
             Should only be used in test scripts to avoid accidental loss of data.
+
+        Returns
+        -------
+        None
+            All relevant metadata and progress on each iteration will be stored in path.
         """
         log_mode = "new" if not _overwrite_log else "replace"
 
@@ -271,25 +378,40 @@ class RateConstantOptimizerTemplate(ABC):
                           x0_min: float = 1e-6,
                           n_jobs: int = 1,
                           backend: str = "loky",
-                          **optimize_kwargs):
-        """
-        Optimizes the system, utilizing a nelder-mead algorithm, for a given number of runs. Each run has random
-        starting positions for each parameter, which is distributed according to a loguniform distribution. The bounds
-        of the starting position (x0_bounds) can be separately controlled from the bounds the system is allowed to
-        explore (x_bounds). If the given path already has an existing directory called 'optimization_multiple_guess',
-        the optimization will be resumed from that point onwards.
-        :param path: Where the solution should be stored.
-        :param n_runs: The number of runs which are to be computed.
-        :param x_description: Description of each parameter.
-        :param x_bounds: scipy.optimize.Bounds of each parameter.
-        :param x0_bounds: A list containing tuples, containing the lower and upper boundaries for the starting value of
-            each parameter. By default, it is identical to the x_bounds. Lower bounds smaller than x0_min are set to x0_min.
+                          **optimize_kwargs) -> None:
+        """Optimizes the system, utilizing a nelder-mead algorithm, for a given number of runs.
+        Each run has random starting positions for each parameter, which is distributed according to a loguniform
+        distribution. The bounds of the starting position (x0_bounds) can be separately controlled from the bounds the
+        system is allowed to explore (x_bounds). If the given path already has an existing directory called
+        'optimization_multiple_guess', the optimization will be resumed from that point onwards.
+
+        Args
+        ----
+        path
+            The path to the folder where the optimization progress should be stored.
+        n_runs
+            The number of runs which are to be computed.
+        x_description
+            Description of each parameter.
+        x_bounds
+            The scipy.optimize.bounds of each parameter.
+        x0_bounds
+            The scipy.optimize.bounds for the starting value of each parameter.
+            By default, it is identical to the x_bounds. Lower bounds smaller than x0_min are set to x0_min.
             When the upper bound is 0, the corresponding x0 will also be set to 0. This disables the reaction.
-        :param x0_min: The minimum value the lower bound of x0_bounds can take. Any values lower than it is set to
-            x0_min.
-        :param n_jobs: The number of processes which should be used, if -1, all available cores are used.
-        :param backend: The backend that is used by Joblib. Loky (default) works on all platforms.
-        :param optimize_kwargs: The key word arguments that will be passed to self.optimize.
+        x0_min
+            The minimum value the lower bound of x0_bounds can take. Any values lower than it is set to x0_min.
+        n_jobs
+            The number of processes which should be used, if -1, all available cores are used.
+        backend
+            The backend that is used by Joblib. Loky (default) works on all platforms.
+        **optimize_kwargs
+            The key word arguments that will be passed to self.optimize.
+
+        Returns
+        -------
+        None
+            All data of run n will be stored at 'path/guess_n/'.
         """
         try:
             os.mkdir(path)
@@ -305,7 +427,7 @@ class RateConstantOptimizerTemplate(ABC):
         x0_bounds = [(lb, ub,) if lb > x0_min else (x0_min, ub) for lb, ub in zip(x0_bounds.lb, x0_bounds.ub)]
 
         Parallel(n_jobs=n_jobs, verbose=100, backend=backend)(
-            delayed(self.optimize_random_guess)(
+            delayed(self._optimize_random_guess)(
                 seed=seed,
                 x_description=x_description,
                 x_bounds=x_bounds,
@@ -316,7 +438,8 @@ class RateConstantOptimizerTemplate(ABC):
             for seed in range(start_seed, start_seed + n_runs)
         )
 
-    def optimize_random_guess(self, seed, x_description, x_bounds, x0_bounds, path, optimize_kwargs):
+    def _optimize_random_guess(self, seed, x_description, x_bounds, x0_bounds, path, optimize_kwargs):
+        """Creates a random guess from a seed, and optimizes it"""
         # log uniform from scipy is not supported in 1.3.3
         def loguniform(lo, hi):
             return lo ** ((((log(hi) / log(lo)) - 1) * random()) + 1)
@@ -340,9 +463,16 @@ class RateConstantOptimizerTemplate(ABC):
 
     @staticmethod
     def load_optimization_progress(path: str) -> OptimizerProgress:
-        """
-        Loads in the data from the log files.
-        :param path: Folder in which the optimization_log.json and settings_info.json files can be found.
-        :return: OptimizerProgress instance which contains all information that was logged.
+        """Loads in the data from the log files.
+
+        Parameters
+        ----------
+        path
+            The path to the folder where the optimization progress has been stored.
+
+        Returns
+        -------
+        :class:`OptimizerProgress`
+            A structured OptimizerProgress instance which contains all information that was logged.
         """
         return OptimizerProgress(path)
