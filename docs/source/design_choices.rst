@@ -49,13 +49,6 @@ Subsequently we multiply this with the rate constant, :math:`k`, and add this to
 we subtract it from each reactant. Because we take a very simple approach to calculating the derivative, this method only
 works for reaction steps which are first order in each chemical.
 
-DataFrame Libraries
--------------------
-The :func:`predict.DRL.predict_concentration` function returns polars.DataFrames instead of pandas.DataFrames as they
-turned out to be alot more efficient to calculate the DRL curves and errors with. However, pandas series are more
-convenient to print, and manipulate, as they behave more like dictionaries. Furthermore pandas objects give more
-flexibility to store the data as JSON files. This is why two different dataframe libraries are used simultaneously.
-
 Explict Euler formula
 ---------------------
 The explicit Euler formula takes the rate of changes as calculated above, and adds it to the currently known concentrations.
