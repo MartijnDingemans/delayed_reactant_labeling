@@ -10,3 +10,7 @@
 .rst-content code, .rst-content tt, code {
     font-size: 100% !important;
 }
+
+span.eqno {
+    float: right !important;
+}
