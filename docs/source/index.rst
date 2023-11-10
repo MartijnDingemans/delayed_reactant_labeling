@@ -26,4 +26,5 @@ Contents
    predict
    optimize
    visualize
+   extensive_example
    design_choices
