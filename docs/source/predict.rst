@@ -62,7 +62,7 @@ Internally, the function calls ``solve_ivp``.
     A0 = 1
 
     drl = DRL(rate_constants=rate_constants, reactions=reactions, output_order=['A', 'B', 'C'], verbose=False)
-    result = solve_ivp(drl.calculate_step, t_span=[0, 20], y0=[A0, 0, 0], method='Radau', t_eval=time, jac=drl.calculate_jac)
+    result = solve_ivp(drl.calculate_step, t_span=[time[0], time[-1]], y0=[A0, 0, 0], method='Radau', t_eval=time, jac=drl.calculate_jac)
 
 However, also algebraic `solutions <https://chem.libretexts.org/Bookshelves/Physical_and_Theoretical_Chemistry_Textbook_Maps/Mathematical_Methods_in_Chemistry_(Levitus)/04%3A_First_Order_Ordinary_Differential_Equations/4.03%3A_Chemical_Kinetics>`_
 for this specific chemical problem exist.
@@ -106,3 +106,29 @@ We can compare the algebraic solution to the modelled prediction as follows.
 It is clear that the model fits the data very well, and its much easier to implement these few lines of code, instead of
 doing the mathematics. Furthermore, implementing more difficult problems only requires the addition of a few lines here,
 whereas solving the problem in an exact manner becomes impossible.
+
+This current system can also be converted to a DRL experiment by adding a labeled reactant A at a certain timestamp.
+This labeled reactant reacts in a identical manner to A, except that the corresponding products are also labeled.
+It could be implemented as follows:
+
+.. code-block:: python
+
+    reaction1 = ('k1', ['A-labeled'], ['B-labeled'])
+    reaction2 = ('k2', ['B-labeled'], ['C-labeled'])
+    reactions.extend([reaction1, reaction2])
+
+    drl = DRL(reactions=reactions, rate_constants=rate_constants)
+    prediction = drl.predict_concentration(
+        t_eval_pre=np.linspace(0, 2.5, 2500),
+        t_eval_post=np.linspace(2.5, 20, 17500),
+        initial_concentrations={"A": 1},
+        labeled_concentration={"A-labeled": 0.8},
+        dilution_factor=0.8
+    )
+    ax = prediction.plot('time')
+    ax.set_xlabel("time")
+    ax.set_ylabel("concentration")
+
+.. image:: images/predict_drl_prediction.png
+    :width: 600
+    :align: center
