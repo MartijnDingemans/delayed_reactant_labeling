@@ -18,6 +18,7 @@ from delayed_reactant_labeling.predict import DRL
 from delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate
 from delayed_reactant_labeling.visualize import VisualizeMultipleSolutions
 
+
 def analyze_model_boundary(use_noise, use_tic, optimize=False):
     warnings.warn(f"TIC: {use_tic}, NOISE {use_noise}")  # warnings.warn so its shows up in the log easily
 
@@ -95,7 +96,8 @@ def analyze_model_boundary(use_noise, use_tic, optimize=False):
 
     def explore_boundary(path, k1, kr1, k2, noise_func):
         path = pathlib.Path(f'{path}/k1_{k1}_kr1_{kr1}_k2_{k2}/')
-        path.mkdir(exist_ok=True, parents=True)
+        if optimize:
+            path.mkdir(exist_ok=True, parents=True)
 
         # "real" fake data
         rate_constants_real = {'k1': k1, 'k-1': kr1, 'k2': k2}
@@ -118,8 +120,8 @@ def analyze_model_boundary(use_noise, use_tic, optimize=False):
 
         fig, ax = plt.subplots()
         real_data.plot('time', ax=ax)
-
-        fig.savefig(f'{path}/real_data.png', dpi=200)
+        if optimize:
+            fig.savefig(f'{path}/real_data.png', dpi=200)
 
         # add noise
         fake_data = []
@@ -132,10 +134,11 @@ def analyze_model_boundary(use_noise, use_tic, optimize=False):
 
         fake_data.append(real_data['time'])
         fake_data = pd.DataFrame(fake_data, index=real_data.columns).T
-        fig.savefig(f'{path}/fake_data.png', dpi=200)
+        if optimize:
+            fig.savefig(f'{path}/fake_data.png', dpi=200)
 
-        ax.set_yscale("log")
-        fig.savefig(f'{path}/fake_data_logscale.png', dpi=200)
+            ax.set_yscale("log")
+            fig.savefig(f'{path}/fake_data_logscale.png', dpi=200)
         plt.close(fig)
 
         RCO = RateConstantOptimizer(raw_weights={}, experimental=fake_data, metric=METRIC)
@@ -149,7 +152,7 @@ def analyze_model_boundary(use_noise, use_tic, optimize=False):
             to_zip(path)  # individual files take up at least 1 Mb at the server, -> zipping reduces size load drastically.
 
         # analysis of the data
-        with zipfile.ZipFile(f'optimization/{path}.zip', mode="r") as archive:
+        with zipfile.ZipFile(f'optimization/optimization_model_boundaries/{path}.zip', mode="r") as archive:
             archive.extractall(path=f'optimization/{path}')
         VMS = VisualizeMultipleSolutions(f'optimization/{path}/multiple_guess/')
         shutil.rmtree(f'optimization/{path}')
@@ -196,4 +199,4 @@ def analyze_model_boundary(use_noise, use_tic, optimize=False):
 
 
 if __name__ == "__main__":
-    analyze_model_boundary(use_noise=True, use_tic=False, optimize=False)
+    analyze_model_boundary(use_noise=False, use_tic=False, optimize=False)
