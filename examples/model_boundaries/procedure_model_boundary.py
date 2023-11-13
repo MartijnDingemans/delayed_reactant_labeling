@@ -4,6 +4,7 @@ import pathlib
 import shutil
 import warnings
 import zipfile
+import logging
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -20,7 +21,13 @@ from delayed_reactant_labeling.visualize import VisualizeMultipleSolutions
 
 
 def analyze_model_boundary(use_noise, use_tic, optimize=False):
-    warnings.warn(f"TIC: {use_tic}, NOISE {use_noise}")  # warnings.warn so its shows up in the log easily
+    path_settings = pathlib.Path(f'./n_{use_noise}_t_{use_tic}_TIC_0.1/')
+    path_settings.mkdir(exist_ok=True)
+
+    logging.basicConfig(
+        filename=f'{path_settings}/model_boundary.log'
+    )
+    logging.info(f"TIC: {use_tic}, NOISE {use_noise}")
 
     reactions = [
         ('k1', ['A', 'cat'], ['B'],),
@@ -141,7 +148,7 @@ def analyze_model_boundary(use_noise, use_tic, optimize=False):
             fig.savefig(f'{path}/fake_data_logscale.png', dpi=200)
         plt.close(fig)
 
-        RCO = RateConstantOptimizer(raw_weights={}, experimental=fake_data, metric=METRIC)
+        RCO = RateConstantOptimizer(raw_weights={"TIC_": 0.1}, experimental=fake_data, metric=METRIC)
         dimension_description = ['k1', 'k-1', 'k2']
         x_bounds = Bounds(np.array([1e-9, 0, 1e-9]), np.array([100, 100, 100]))  # lower, upper
 
@@ -150,40 +157,41 @@ def analyze_model_boundary(use_noise, use_tic, optimize=False):
                                   x_description=dimension_description, n_jobs=-1,
                                   metadata={"USE_NOISE": use_noise, "USE_TIC": use_tic})
             to_zip(path)  # individual files take up at least 1 Mb at the server, -> zipping reduces size load drastically.
+            return None
+        else:
+            # analysis of the data
+            with zipfile.ZipFile(f'optimization/optimization_model_boundaries/{path}.zip', mode="r") as archive:
+                archive.extractall(path=f'optimization/{path}')
+            VMS = VisualizeMultipleSolutions(f'optimization/{path}/multiple_guess/')
+            shutil.rmtree(f'optimization/{path}')
 
-        # analysis of the data
-        with zipfile.ZipFile(f'optimization/optimization_model_boundaries/{path}.zip', mode="r") as archive:
-            archive.extractall(path=f'optimization/{path}')
-        VMS = VisualizeMultipleSolutions(f'optimization/{path}/multiple_guess/')
-        shutil.rmtree(f'optimization/{path}')
+            # using the "real" values
+            pred = RCO.create_prediction(x=[k1, kr1, k2], x_description=dimension_description)
+            errors = RCO.calculate_errors(pred)
+            total_error_real = RCO.calculate_total_error(errors)
 
-        # using the "real" values
-        pred = RCO.create_prediction(x=[k1, kr1, k2], x_description=dimension_description)
-        errors = RCO.calculate_errors(pred)
-        total_error_real = RCO.calculate_total_error(errors)
+            # using best found values
+            sorted_index = VMS.complete_found_error.argsort()
+            best_run = sorted_index[0]
+            best_X = pd.Series(VMS.complete_optimal_X[best_run], index=VMS.x_description)
 
-        # using best found values
-        sorted_index = VMS.complete_found_error.argsort()
-        best_run = sorted_index[0]
-        best_X = pd.Series(VMS.complete_optimal_X[best_run], index=VMS.x_description)
-
-        out = pd.Series({
-            "k1": k1,
-            "kr1": kr1,
-            "k2": k2,
-            "A_td": fake_data.loc[40:60, "A"].mean(),
-            "B_td": fake_data.loc[40:60, "B"].mean(),
-            "C_td": fake_data.loc[40:60, "C"].mean(),
-            "real_error": total_error_real,
-            "best_error": VMS.complete_found_error[best_run],
-            "best_k1": best_X["k1"],
-            "best_kr1": best_X["k-1"],
-            "best_k2": best_X["k2"],
-            "k1_ratio": best_X["k1"] / k1,
-            "kr1_ratio": best_X["k-1"] / kr1,
-            "k2_ratio": best_X["k2"] / k2,
-        })
-        return out
+            out = pd.Series({
+                "k1": k1,
+                "kr1": kr1,
+                "k2": k2,
+                "A_td": fake_data.loc[40:60, "A"].mean(),
+                "B_td": fake_data.loc[40:60, "B"].mean(),
+                "C_td": fake_data.loc[40:60, "C"].mean(),
+                "real_error": total_error_real,
+                "best_error": VMS.complete_found_error[best_run],
+                "best_k1": best_X["k1"],
+                "best_kr1": best_X["k-1"],
+                "best_k2": best_X["k2"],
+                "k1_ratio": best_X["k1"] / k1,
+                "kr1_ratio": best_X["k-1"] / kr1,
+                "k2_ratio": best_X["k2"] / k2,
+            })
+            return out
 
     data = []
     rate_values = [0.01, 0.1, 1, 5]
@@ -191,12 +199,12 @@ def analyze_model_boundary(use_noise, use_tic, optimize=False):
         for _kr1 in rate_values:
             for _k2 in rate_values:
                 try:
-                    data.append(explore_boundary(f'./n_{use_noise}_t_{use_tic}/', _k1, _kr1, _k2, noise_func=noisify))
+                    data.append(explore_boundary(f'./{path_settings}/', _k1, _kr1, _k2, noise_func=noisify))
                 except Exception as e:
-                    warnings.warn(f"k1_{_k1}_kr1_{_kr1}_k2_{_k2} yielded error: {e}")
+                    logging.error(e, exc_info=True)
     df = pd.DataFrame(data)
-    df.to_excel(f"bounds_n_{use_noise}_t_{use_tic}.xlsx")
+    df.to_excel(f"bounds_n_{use_noise}_t_{use_tic}_TIC_0.1.xlsx")
 
 
 if __name__ == "__main__":
-    analyze_model_boundary(use_noise=False, use_tic=False, optimize=False)
+    analyze_model_boundary(use_noise=True, use_tic=True, optimize=False)
