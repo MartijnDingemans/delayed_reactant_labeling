@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import pathlib
 from typing import Optional
 import matplotlib.pyplot as plt
 import numpy as np
@@ -365,21 +366,21 @@ class VisualizeSingleSolution:
 
 
 class VisualizeMultipleSolutions:
-    def __init__(self, path, max_guess=np.inf):
-        """Loads the data in the path. For each """
-        guess_files = os.listdir(path)
-
+    def __init__(self, path: pathlib.Path, max_guess: int = np.inf):
+        """Loads the data in the path."""
         self.complete_all_X = []
         self.complete_initial_X = []
         self.complete_optimal_X = []
         self.complete_found_error = []
         self.x_description = None
 
-        for n, guess in tqdm(enumerate(guess_files)):
+        for n, guess_path in tqdm(enumerate(path.iterdir())):
+            if not guess_path.is_dir():
+                max_guess += 1
+                continue
             if n > max_guess:
                 break
 
-            guess_path = f"{path}/{guess}"
             progress = OptimizerProgress(guess_path)
 
             self.complete_all_X.append(progress.all_X)
