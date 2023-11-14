@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import os
+import pathlib
 import warnings
 from abc import ABC, abstractmethod
 from datetime import datetime
 from math import log
 from random import random
 from typing import Optional, Callable
-
 import numpy as np
 import pandas as pd  # used for storage of the data, its series objects are much more powerful.
 from delayed_reactant_labeling.predict import InvalidPredictionError
@@ -76,9 +76,12 @@ class OptimizerProgress:
     simplex : np.ndarray
         An array of size [N + 1, N] corresponding to the N parameters for each of the N + 1 best iterations
     """
-    def __init__(self, path: str):
+    def __init__(self, path: pathlib.Path):
+        if not path.is_dir():
+            raise ValueError(f'The given path was not a directory!\n{path}')
+
         # read the meta data
-        self.metadata: dict[str, any] = pd.read_json(f"{path}/settings_info.json", lines=True).iloc[0, :]
+        self.metadata: dict[str, any] = pd.read_json(path.joinpath("settings_info.json"), lines=True).iloc[0, :]
         self.x_description = list(self.metadata["x_description"])
 
         # read the optimization log
@@ -305,7 +308,9 @@ class RateConstantOptimizerTemplate(ABC):
         Returns
         -------
         None
-            All relevant metadata and progress on each iteration will be stored in path.
+            All relevant metadata and progress on each iteration will be stored in path. It can be loaded and analyzed
+            either by using the :class:`visualize.VisualizeSingleSolution`, or :meth:`load_optimization_progress` which returns
+            an :class:`OptimizerProgress` instance.
         """
         log_mode = "new" if not _overwrite_log else "replace"
 
