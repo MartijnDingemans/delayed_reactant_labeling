@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import pathlib
 import warnings
@@ -85,7 +86,21 @@ class OptimizerProgress:
         self.x_description = list(self.metadata["x_description"])
 
         # read the optimization log
-        df = pd.read_json(f"{path}/optimization_log.json", lines=True)
+        try:
+            df = pd.read_json(f"{path}/optimization_log.json", lines=True)
+        except ValueError:
+            with open(f"{path}/optimization_log.json") as f:
+                lines = f.readlines()
+            df = []
+            n_failed = 0
+            for line in lines:
+                try:
+                    df.append(json.loads(line))
+                except ValueError:
+                    n_failed += 1
+            df = pd.DataFrame(df)
+            warnings.warn(f'failed to read {n_failed} lines in {path}/optimization_log.json')
+
         self.n_dimensions = len(self.x_description)
         self.n_iterations = len(df)
 
@@ -272,7 +287,7 @@ class RateConstantOptimizerTemplate(ABC):
                  x0: np.ndarray,
                  x_description: list[str],
                  x_bounds: Bounds,
-                 path: str,
+                 path: pathlib.Path,
                  metadata: Optional[dict] = None,
                  maxiter: float = 50000,
                  resume_from_simplex: np.ndarray=None,
@@ -315,7 +330,7 @@ class RateConstantOptimizerTemplate(ABC):
         log_mode = "new" if not _overwrite_log else "replace"
 
         # enable logging of all information retrieved from the system
-        log_path = f"{path}/optimization_log.json"
+        log_path = path.joinpath(f'optimization_log.json')
         if resume_from_simplex is None:  # new optimization progres
             logger = JSON_log(log_path, mode=log_mode)
             metadata_extended = {
@@ -375,7 +390,7 @@ class RateConstantOptimizerTemplate(ABC):
             raise e
 
     def optimize_multiple(self,
-                          path: str,
+                          path: pathlib.Path,
                           n_runs: int,
                           x_description: list[str],
                           x_bounds: Bounds,
@@ -419,7 +434,7 @@ class RateConstantOptimizerTemplate(ABC):
             All data of run n will be stored at 'path/guess_n/'.
         """
         try:
-            os.mkdir(path)
+            path.mkdir(exist_ok=False)  # actually, it is okay, but a warning should be given!
             start_seed = 0
         except FileExistsError:
             start_seed = len(os.listdir(path))
@@ -450,8 +465,8 @@ class RateConstantOptimizerTemplate(ABC):
             return lo ** ((((log(hi) / log(lo)) - 1) * random()) + 1)
 
         x0 = np.array([loguniform(lb, ub) if ub > 0 else 0 for lb, ub in x0_bounds])
-        path = f'{path}/guess_{seed}/'
-        os.mkdir(path)
+        path = path.joinpath(f'guess_{seed}/')
+        path.mkdir()
 
         try:
             self.optimize(
