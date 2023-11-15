@@ -77,7 +77,10 @@ class OptimizerProgress:
     simplex : np.ndarray
         An array of size [N + 1, N] corresponding to the N parameters for each of the N + 1 best iterations
     """
-    def __init__(self, path: pathlib.Path):
+    def __init__(self, path: str | pathlib.Path):
+        if not isinstance(path, pathlib.Path):
+            path = pathlib.Path(path)
+
         if not path.is_dir():
             raise ValueError(f'The given path was not a directory!\n{path}')
 
@@ -86,10 +89,11 @@ class OptimizerProgress:
         self.x_description = list(self.metadata["x_description"])
 
         # read the optimization log
+        log_path = path.joinpath("optimization_log.json")
         try:
-            df = pd.read_json(f"{path}/optimization_log.json", lines=True)
+            df = pd.read_json(log_path, lines=True)
         except ValueError:
-            with open(f"{path}/optimization_log.json") as f:
+            with open(log_path) as f:
                 lines = f.readlines()
             df = []
             n_failed = 0
@@ -99,7 +103,7 @@ class OptimizerProgress:
                 except ValueError:
                     n_failed += 1
             df = pd.DataFrame(df)
-            warnings.warn(f'failed to read {n_failed} lines in {path}/optimization_log.json')
+            warnings.warn(f'failed to read {n_failed} lines in {log_path}')
 
         self.n_dimensions = len(self.x_description)
         self.n_iterations = len(df)
@@ -114,6 +118,7 @@ class OptimizerProgress:
             simplex[n, :] = self.all_X.iloc[index, :].to_numpy()
         self.simplex = simplex
 
+        # noinspection PyUnresolvedReferences
         best_iteration_index = sorted_errors.index[0]
 
         self.best_X: pd.Series = pd.Series(self.all_X.loc[best_iteration_index, :], index=self.x_description)
@@ -287,12 +292,12 @@ class RateConstantOptimizerTemplate(ABC):
                  x0: np.ndarray,
                  x_description: list[str],
                  x_bounds: Bounds,
-                 path: pathlib.Path,
+                 path: str | pathlib.Path,
                  metadata: Optional[dict] = None,
                  maxiter: float = 50000,
-                 resume_from_simplex: np.ndarray=None,
-                 show_pbar: bool=True,
-                 _overwrite_log: bool=False,
+                 resume_from_simplex: np.ndarray = None,
+                 show_pbar: bool = True,
+                 _overwrite_log: bool = False,
                  ) -> None:
         """Optimizes the system, utilizing a nelder-mead algorithm.
 
@@ -329,6 +334,9 @@ class RateConstantOptimizerTemplate(ABC):
         """
         log_mode = "new" if not _overwrite_log else "replace"
 
+        if not isinstance(path, pathlib.Path):
+            path = pathlib.Path(path)
+
         # enable logging of all information retrieved from the system
         log_path = path.joinpath(f'optimization_log.json')
         if resume_from_simplex is None:  # new optimization progres
@@ -344,7 +352,7 @@ class RateConstantOptimizerTemplate(ABC):
                 # overwrites the default meta data values
                 for key, value in metadata.items():
                     metadata_extended[key] = value
-            meta_data_log = JSON_log(f"{path}/settings_info.json", mode=log_mode)
+            meta_data_log = JSON_log(path.joinpath("settings_info.json"), mode=log_mode)
             meta_data_log.log(pd.Series(metadata_extended))
         else:
             logger = JSON_log(log_path, mode="append")
@@ -390,7 +398,7 @@ class RateConstantOptimizerTemplate(ABC):
             raise e
 
     def optimize_multiple(self,
-                          path: pathlib.Path,
+                          path: str | pathlib.Path,
                           n_runs: int,
                           x_description: list[str],
                           x_bounds: Bounds,
@@ -433,6 +441,9 @@ class RateConstantOptimizerTemplate(ABC):
         None
             All data of run n will be stored at 'path/guess_n/'.
         """
+        if not isinstance(path, pathlib.Path):
+            path = pathlib.Path(path)
+
         try:
             path.mkdir(exist_ok=False)  # actually, it is okay, but a warning should be given!
             start_seed = 0
@@ -458,7 +469,13 @@ class RateConstantOptimizerTemplate(ABC):
             for seed in range(start_seed, start_seed + n_runs)
         )
 
-    def _optimize_random_guess(self, seed, x_description, x_bounds, x0_bounds, path, optimize_kwargs):
+    def _optimize_random_guess(self,
+                               seed: int,
+                               x_description: list[str],
+                               x_bounds: Bounds,
+                               x0_bounds: list[tuple[float, float]],
+                               path: pathlib.Path,
+                               optimize_kwargs):
         """Creates a random guess from a seed, and optimizes it"""
         # log uniform from scipy is not supported in 1.3.3
         def loguniform(lo, hi):
@@ -482,7 +499,7 @@ class RateConstantOptimizerTemplate(ABC):
             pass  # results are stored incase an error occurred due to self.optimize.
 
     @staticmethod
-    def load_optimization_progress(path: str) -> OptimizerProgress:
+    def load_optimization_progress(path: str | pathlib.Path) -> OptimizerProgress:
         """Loads in the data from the log files.
 
         Parameters
