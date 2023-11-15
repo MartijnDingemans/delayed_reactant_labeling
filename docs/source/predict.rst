@@ -17,6 +17,8 @@ found in the implementation details section.
 .. autoclass:: DRL
     :members:
 
+.. _PredictExample:
+
 example
 -------
 The simple chemical system:

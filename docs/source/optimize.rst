@@ -24,6 +24,8 @@ error between both datasets.
 
 .. autoclass:: OptimizerProgress
 
+.. _OptimizeExample:
+
 Example
 -------
 To optimize the rate constants we will analyze a simple system. We can describe the model and the experimental
@@ -116,8 +118,9 @@ the data should be analyzed.
         @staticmethod
         def create_prediction(x: np.ndarray, x_description: list[str]) -> pd.DataFrame:
             rate_constants = pd.Series(x, x_description)
-            # The rate constants can easily be manipulated here, for example:
+            # The rate constants can easily be manipulated here. For example,
             # rate_constants["k1"] = 0.42 would fixate that value.
+            # Because Series are mutable, the changed version will be stored in the logs!
 
             drl = DRL(reactions=reactions, rate_constants=rate_constants)
             pred_labeled = drl.predict_concentration(
@@ -190,6 +193,7 @@ with many different reactions. To analyze multiple runs from different starting 
         n_jobs=-2,
     )
 
+    import os
     error = []
     bestX = []
     for file in os.listdir('./optimization_multiple/'):

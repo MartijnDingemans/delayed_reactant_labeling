@@ -63,7 +63,7 @@ First we import the required modules, and show the original data around the time
 
 We can clearly see that around 10.15 minutes the intensity of 3D increases rapidly. Therefore, this seems like a good
 t0. Furthermore we see that many of the labeled compounds (dashed lines) have intensities before the chemicals should
-be present. We can correct our data according to these two factors as follows:
+be present. We can correct our data according for these two factors as follows:
 
 .. code-block:: python
 
@@ -71,13 +71,13 @@ be present. We can correct our data according to these two factors as follows:
 
     TIME_LABELED_ADDITION = 10.15
     index_labeled_addition = np.argmax(experimental_complete['time (min)'] > TIME_LABELED_ADDITION)  # select first true value
-    for col in experimental_complete.columns:
+    for col in experimental_complete.columns:  # correct for noise by removing the median
         if col == 'time (min)' or col[-len(LABEL):] != LABEL:
             continue
         experimental_complete.loc[:, col] = experimental_complete.loc[:, col] \
             - experimental_complete.loc[index_labeled_addition-10:index_labeled_addition, col].median()
 
-    experimental_complete.plot('time (min)', f'3D{LABEL}', ax=ax, label=f'3D{LABEL} corrected')  # if only one line is shown, make sure to run the cell above beforehand!
+    experimental_complete.plot('time (min)', f'3D{LABEL}', ax=ax, label=f'3D{LABEL} corrected')
     ax.set_xlim(10, 10.5)
     ax.set_ylim(-0.05, 0.2)
     ax.figure.show()
@@ -90,8 +90,8 @@ be present. We can correct our data according to these two factors as follows:
     :width: 600
     :align: center
 
-Defining the METRIC
--------------------
+Defining the error metric
+-------------------------
 
 For the typical DRL experiment, the focus is on the initial part of the curve, as this is where the largest changes occur.
 When we optimize the model, we can weigh these initial parts more heavily than others.
@@ -246,9 +246,11 @@ its backwards reaction.
     INTERMEDIATES = ["3", "4/5"]
 
 The next step is to the create our RateConstantOptimizer class. We will apply three different kinds of error metrics.
+
 1. label ratio: The ratio of e.g. 3D / (3D+3D'), the typical DRL curve.
 2. isomer ratio: The ratio of e.g. 3D / (3D + 3E + 3F).
 3. TIC shape: how well the curve represent the shape of the TIC curve.
+
 We will apply weights to each type of error to make sure that the system prioritizes getting the label ratio right, but
 would see it as a benefit if the isomer ratio also fits well. In the optimized model the three different kinds of error
 are relatively similar to each other in the contribution to the total error. The weight of all isomers F has been
@@ -374,7 +376,7 @@ We can than optimize the system once like this:
         x_description=dimension_descriptions,
         x_bounds=bounds,
         path=path,
-        maxiter=50000,  # this might take a while!
+        maxiter=50000,  # this might take a while! 34378 iterations on my machine in 17 minutes
     )
 
 Or multiple times:
@@ -397,8 +399,11 @@ We can visualize the curves that are used for the caluclation of the error as fo
 .. code-block:: python
 
     fig_label, axs_label = plt.subplots(3, 1, tight_layout=True, figsize=(8, 8), squeeze=False)
+    fig_label.suptitle('label ratio')
     fig_isomer, axs_isomer = plt.subplots(2, 1, tight_layout=True, squeeze=False)
+    fig_isomer.suptitle('isomer ratio')
     fig_TIC, axs_TIC = plt.subplots(3, 2, tight_layout=True, figsize=(8, 8), squeeze=False)
+    fig_TIC.suptitle('TIC shape')
     marker_settings = {"alpha": 0.4, "marker": ".", "s": 1}
 
     progress = RCO.load_optimization_progress(path)
@@ -436,3 +441,22 @@ We can visualize the curves that are used for the caluclation of the error as fo
             axs_TIC[j, i].plot(time, pred[f"TIC_{chemical_iso_split}'"],
                                color="tab:gray", label=f"""{chemical_iso_split} MAE: {errors[f"TIC_{chemical_iso_split}'"]:.3f}""")
             axs_TIC[j, i].scatter(time, RCO.experimental_curves[f"TIC_{chemical_iso_split}'"], color="tab:gray", **marker_settings)
+
+    for ax in np.concatenate([axs_label.flatten(), axs_isomer.flatten(), axs_TIC.flatten()]):
+        ax.legend()
+
+    fig_label.show()
+    fig_isomer.show()
+    fig_TIC.show()
+
+.. image:: images/extensive_example_label.png
+    :width: 600
+    :align: center
+
+.. image:: images/extensive_example_isomer.png
+    :width: 600
+    :align: center
+
+.. image:: images/extensive_example_TIC.png
+    :width: 600
+    :align: center

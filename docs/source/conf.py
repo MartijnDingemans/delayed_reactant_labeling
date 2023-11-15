@@ -9,7 +9,7 @@ import optimize
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'Delayed-Reactant-Labeling'
-# copyright = '2023, Martijn Dingemans'
+copyright = '2023, Martijn Dingemans'
 author = 'Martijn Dingemans'
 release = '0.2.5'
 
