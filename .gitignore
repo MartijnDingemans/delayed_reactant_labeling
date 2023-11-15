@@ -7,4 +7,6 @@ pyproject.toml
 /docs/build/
 /dist/
 /examples/optimization/
-/example_server/optimize/
+/examples/model_boundaries/optimization/
+/examples/docs/optimization/
+/examples/docs/optimization_multiple
