@@ -51,7 +51,7 @@ Lets assume that we know the rate constants belonging to this reaction.
 We can create a prediction using the :func:`DRL.predict_concentration`. The class implements the method which determines
 the rate of change as a function of its current state, and a method which calculate the Jacobian based on its state.
 Because we do not want to model an entire DRL experiment, ``solve_ivp`` is used instead of :func:`DRL.predict_concentration`.
-Internally, the function calls ``solve_ivp``.
+Internally, this function also calls ``solve_ivp``.
 
 .. code-block:: python
 
@@ -64,7 +64,13 @@ Internally, the function calls ``solve_ivp``.
     A0 = 1
 
     drl = DRL(rate_constants=rate_constants, reactions=reactions, output_order=['A', 'B', 'C'], verbose=False)
-    result = solve_ivp(drl.calculate_step, t_span=[time[0], time[-1]], y0=[A0, 0, 0], method='Radau', t_eval=time, jac=drl.calculate_jac)
+    result = solve_ivp(
+        drl.calculate_step,
+        t_span=[time[0], time[-1]],
+        y0=[A0, 0, 0],
+        method='Radau',
+        t_eval=time,
+        jac=drl.calculate_jac)
 
 However, also algebraic `solutions <https://chem.libretexts.org/Bookshelves/Physical_and_Theoretical_Chemistry_Textbook_Maps/Mathematical_Methods_in_Chemistry_(Levitus)/04%3A_First_Order_Ordinary_Differential_Equations/4.03%3A_Chemical_Kinetics>`_
 for this specific chemical problem exist.
@@ -115,9 +121,9 @@ It could be implemented as follows:
 
 .. code-block:: python
 
-    reaction1 = ('k1', ['A-labeled'], ['B-labeled'])
-    reaction2 = ('k2', ['B-labeled'], ['C-labeled'])
-    reactions.extend([reaction1, reaction2])
+    reaction3 = ('k1', ['A-labeled'], ['B-labeled'])
+    reaction4 = ('k2', ['B-labeled'], ['C-labeled'])
+    reactions.extend([reaction3, reaction4])
 
     drl = DRL(reactions=reactions, rate_constants=rate_constants)
     prediction = drl.predict_concentration(
@@ -130,6 +136,7 @@ It could be implemented as follows:
     ax = prediction.plot('time')
     ax.set_xlabel("time")
     ax.set_ylabel("concentration")
+    ax.figure.show()
 
 .. image:: images/predict_drl_prediction.png
     :width: 600

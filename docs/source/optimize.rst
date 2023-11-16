@@ -1,21 +1,20 @@
 Optimize
 ========
 
+To optimize the rate constants, a model needs to be created that can create a prediction of the concentrations, and
+can subsequently calculate the corresponding errors. This model can than:
 
-To optimize the rate constants, several steps need to be performed, such as:
+1. Create an a guess of the rate constants.
+2. Compare the result of the prediction with the experimental data
+3. Weighing the errors
+4. Save the intermediate results
+5. It will than repeat 1-4 until with different rate constants until the error no longer improves and the rate constants have converged to a stable value or the maximum number of iterations has been reached. The method, that is used to find the next guess, is the `Nelder-Mead <https://docs.scipy.org/doc/scipy/reference/optimize.minimize-neldermead.html>`_ algorithm with adaptive parameters.
 
-1. Defining the error functions
-2. Creating a prediction for a given set of rate constants.
-3. Comparing the result of the prediction with the experimental data
-4. Weighing of the errors
-5. Saving the intermediate results
-6. Repeating the 2-5 until a the error no longer improves and the rate constants have converged to a stable value or the maximum number of iterations has been reached.
-
-The :class:`RateConstantOptimizerTemplate` is an abstract base class which has implemented most of the steps
+The :class:`RateConstantOptimizerTemplate` is an abstract base class which has implemented the numbered steps
 above. However, the user must define the error functions and the exact methodology of creating a prediction. The definition
 of the error functions consists out of two parts. First the data (either experimental or predicted) must be converted to
 a curve of interest, such as: :math:`A / (A + A_{labeled})`. Subsequently a ``metric`` wil be used to evaluate the
-error between both datasets.
+error between each curve of both datasets.
 
 .. py:currentmodule:: optimize
 
