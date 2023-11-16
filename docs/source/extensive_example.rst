@@ -70,7 +70,7 @@ be present. We can correct our data according for these two factors as follows:
     ax = experimental_complete.plot('time (min)', f'3D{LABEL}')
 
     TIME_LABELED_ADDITION = 10.15
-    index_labeled_addition = np.argmax(experimental_complete['time (min)'] > TIME_LABELED_ADDITION)  # select first true value
+    index_labeled_addition = np.argmax(np.array(experimental_complete['time (min)'] > TIME_LABELED_ADDITION))  # select first true value
     for col in experimental_complete.columns:  # correct for noise by removing the median
         if col == 'time (min)' or col[-len(LABEL):] != LABEL:
             continue
@@ -175,7 +175,7 @@ up extract :math:`k_2` from :eq:`3t`. In code this is done as follows:
         if not result.success: print(chemical, result.message)
 
         # show best fit
-        fig, axs = plt.subplots(2, 1, layout='tight')
+        fig, axs = plt.subplots(2, 1)
         fig.suptitle(chemical)
         ax = axs[0]
         ax.plot(time, f(result.x[0]), label=f'MAE: {result.fun:.4f}', color='tab:orange')
@@ -198,6 +198,7 @@ up extract :math:`k_2` from :eq:`3t`. In code this is done as follows:
         ax.set_xlabel('value of rate constant')
         ax.set_ylabel('MAE')
         ax.legend()
+        fig.show()
 
 .. image:: images/extensive_example_kinetics.png
     :width: 600
@@ -258,6 +259,7 @@ drastically decreased because of the large amount of noise in this data.
 
 .. code-block:: python
 
+    from __future__ import annotations
     WEIGHTS = {
         "label_": 1,
         "isomer_": 0.5,
@@ -349,20 +351,22 @@ To optimize the model we need to first define the bounds and starting position o
                                index=dimension_descriptions)
 
     index_reverse_reaction = constraints.index.str.contains("k-")
-    constraints[~index_reverse_reaction] = [1, 1e-9, 1e2]  # forwards; vertex, lower, upper
-    constraints[index_reverse_reaction] = [0.5, 0, 1e2]    # backwards
+    constraints.iloc[np.nonzero(~index_reverse_reaction)] = [1, 1e-9, 1e2]  # forwards; vertex, lower, upper
+    constraints.iloc[np.nonzero(index_reverse_reaction)] = [0.5, 0, 1e2]    # backwards
+    # newer versions of pandas could also use:
+    # constraints[~index_reverse_reaction] = [1, 1e-9, 1e2]
 
     # special case
-    constraints[constraints.index.str.contains("ion")] = [0.01, 1e-6, 1]
+    constraints.iloc[np.nonzero(constraints.index.str.contains("ion"))] = [0.01, 1e-6, 1]
 
-    constraints[constraints.index.str.contains("k2_D")] = [0.441673, 0.4160, 0.4780]
-    constraints[constraints.index.str.contains("k2_E")] = [0.782919, 0.6747, 0.9335]
-    constraints[constraints.index.str.contains("k2_F")] = [0.464105, 0.2418, 1.2277]
+    constraints.iloc[np.nonzero(constraints.index.str.contains("k2_D"))] = [0.441673, 0.4160, 0.4780]
+    constraints.iloc[np.nonzero(constraints.index.str.contains("k2_E"))] = [0.782919, 0.6747, 0.9335]
+    constraints.iloc[np.nonzero(constraints.index.str.contains("k2_F"))] = [0.464105, 0.2418, 1.2277]
 
     # either chemically or experimentally determined to be zero
-    constraints[constraints.index.str.contains("k-1")] = [0, 0, 0]
-    constraints[constraints.index.str.contains("k-3")] = [0, 0, 0]
-    constraints[constraints.index.str.contains("k-4")] = [0, 0, 0]
+    constraints.iloc[np.nonzero(constraints.index.str.contains("k-1"))] = [0, 0, 0]
+    constraints.iloc[np.nonzero(constraints.index.str.contains("k-3"))] = [0, 0, 0]
+    constraints.iloc[np.nonzero(constraints.index.str.contains("k-4"))] = [0, 0, 0]
     vertex = constraints["vertex"].to_numpy()
     bounds = Bounds(constraints['lower'].to_numpy(), constraints['upper'].to_numpy())
 
@@ -406,9 +410,9 @@ We can visualize the curves that are used for the caluclation of the error as fo
     fig_TIC.suptitle('TIC shape')
     marker_settings = {"alpha": 0.4, "marker": ".", "s": 1}
 
-    progress = RCO.load_optimization_progress(path)
+    model = RCO.load_optimized_model(path)
 
-    best_prediction: pd.DataFrame = RCO.create_prediction(progress.best_X, progress.x_description)
+    best_prediction: pd.DataFrame = RCO.create_prediction(model.optimal_x, model.x_description)
 
     true = RCO.experimental_curves
     pred = RCO.calculate_curves(best_prediction)

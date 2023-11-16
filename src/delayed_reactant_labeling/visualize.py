@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from delayed_reactant_labeling.predict import InvalidPredictionError
-from delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate, OptimizerProgress
+from delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate, OptimizedModel
 
 
 class VisualizeSingleSolution:
@@ -24,7 +24,7 @@ class VisualizeSingleSolution:
         self.description = description
         self._best_prediction = None
         self.rate_constant_optimizer = rate_constant_optimizer
-        self.progress = self.rate_constant_optimizer.load_optimization_progress(path)
+        self.progress = self.rate_constant_optimizer.load_optimized_model(path)
         self.isomers = isomers
         self.index_constant_values = index_constant_values
         self.dpi = dpi
@@ -35,7 +35,7 @@ class VisualizeSingleSolution:
             # recompute the best prediction so that we can make plots of it.
             # self.experimental, self._prediction = self.create_prediction(_rate_constants=self.progress.best_rates)
             self._best_prediction = self.rate_constant_optimizer.create_prediction(
-                x=self.progress.best_X.to_numpy(), x_description=self.progress.x_description)
+                x=self.progress.optimal_x.to_numpy(), x_description=self.progress.x_description)
         return self._best_prediction
 
     def show_error_over_time(self, compound_ratio: Optional[list[str]] = None, compound_ratio_points: int = 100) -> \
@@ -49,11 +49,11 @@ class VisualizeSingleSolution:
         if compound_ratio is not None:
             ax2 = ax.twinx()
             found_ratio = []
-            ratio_sampled = np.linspace(0, len(self.progress.all_X) - 1, compound_ratio_points).round(0).astype(int)
+            ratio_sampled = np.linspace(0, len(self.progress.all_x) - 1, compound_ratio_points).round(0).astype(int)
             for iteration in ratio_sampled:
                 pred = self.rate_constant_optimizer.create_prediction(
-                    x=self.progress.all_X.iloc[iteration, :],
-                    x_description=self.progress.all_X.columns)
+                    x=self.progress.all_x.iloc[iteration, :],
+                    x_description=self.progress.all_x.columns)
                 found_ratio.append((pred[compound_ratio[0]] / pred[compound_ratio[1]].sum(axis=1))[-100:].mean())
 
             ax2.scatter(ratio_sampled, found_ratio, alpha=0.3, color="C1")
@@ -84,7 +84,7 @@ class VisualizeSingleSolution:
 
             for k in desired_k:
                 # if a key is not found, it will be replaced by nan, which will not show up in the plot
-                rate_found.append(self.progress.best_X.get(f"{k}_{isomer}", np.nan))
+                rate_found.append(self.progress.optimal_x.get(f"{k}_{isomer}", np.nan))
                 rate_lit.append(literature_k.get(f"{k}_{isomer}", np.nan))
 
             x = np.arange(len(rate_found))
@@ -129,10 +129,10 @@ class VisualizeSingleSolution:
                               wspace=0.05, hspace=0.05)
         ax = fig.add_subplot(gs[0, 1])
 
-        pca = PCA().fit(X=self.progress.all_X)
-        scattered = ax.scatter(self.progress.all_X.dot(pca.components_[0]),
-                               self.progress.all_X.dot(pca.components_[1]),
-                               c=np.arange(len(self.progress.all_X)))
+        pca = PCA().fit(X=self.progress.all_x)
+        scattered = ax.scatter(self.progress.all_x.dot(pca.components_[0]),
+                               self.progress.all_x.dot(pca.components_[1]),
+                               c=np.arange(len(self.progress.all_x)))
         ax.tick_params(top=True, right=True, labeltop=True, labelright=True)
         ax_bbox = ax.get_position(original=True)
         cax = plt.axes([0.85, ax_bbox.ymin, 0.05, ax_bbox.size[1]])
@@ -158,10 +158,10 @@ class VisualizeSingleSolution:
             fig3d = plt.figure()
             ax3d = fig3d.add_subplot(projection="3d")
 
-            ax3d.scatter(self.progress.all_X.dot(pca.components_[0]),
-                         self.progress.all_X.dot(pca.components_[1]),
-                         self.progress.all_X.dot(pca.components_[2]),
-                         c=np.arange(len(self.progress.all_X)))
+            ax3d.scatter(self.progress.all_x.dot(pca.components_[0]),
+                         self.progress.all_x.dot(pca.components_[1]),
+                         self.progress.all_x.dot(pca.components_[2]),
+                         c=np.arange(len(self.progress.all_x)))
             ax3d.tick_params(bottom=False, left=False,
                              labelbottom=False, labelleft=False)
 
@@ -274,7 +274,7 @@ class VisualizeSingleSolution:
 
         fig, (ax_rates, ax_error) = plt.subplots(2)
 
-        ticks = self.progress.all_X.columns[~self.index_constant_values]
+        ticks = self.progress.all_x.columns[~self.index_constant_values]
         x = np.arange(len(ticks))
 
         ax_error.set_xlim(0, n_iter - 1)
@@ -288,7 +288,7 @@ class VisualizeSingleSolution:
 
         for i in tqdm(np.linspace(0, n_iter - 1, n_frames).round().astype(int)):
             # rate plot
-            rates = self.progress.all_X.loc[i, :]
+            rates = self.progress.all_x.loc[i, :]
             ax_rates.clear()
             ax_rates.bar(x, rates.iloc[self.index_constant_values])
 
@@ -321,14 +321,14 @@ class VisualizeSingleSolution:
 
         x_value = np.logspace(lower_power, upper_power, steps)
 
-        ticks = self.progress.best_X[~self.index_constant_values]
+        ticks = self.progress.optimal_x[~self.index_constant_values]
         errors = np.full((len(x_value), len(ticks)), np.nan)
 
         # loop over all non-constant values and adjust those
-        for col, key in enumerate(tqdm(self.progress.best_X[~self.index_constant_values].keys())):
+        for col, key in enumerate(tqdm(self.progress.optimal_x[~self.index_constant_values].keys())):
             for row, adjusted_x in enumerate(x_value):
                 # insert all values into the plot
-                best_X = self.progress.best_X.copy()
+                best_X = self.progress.optimal_x.copy()
                 best_X[key] = adjusted_x
                 try:
                     prediction = self.rate_constant_optimizer.create_prediction(
@@ -381,12 +381,12 @@ class VisualizeMultipleSolutions:
             if n > max_guess:
                 break
 
-            progress = OptimizerProgress(guess_path)
+            progress = OptimizedModel(guess_path)
 
-            self.complete_all_X.append(progress.all_X)
-            self.complete_initial_X.append(progress.all_X.iloc[0, :])
-            self.complete_optimal_X.append(progress.best_X)
-            self.complete_found_error.append(progress.best_error)
+            self.complete_all_X.append(progress.all_x)
+            self.complete_initial_X.append(progress.all_x.iloc[0, :])
+            self.complete_optimal_X.append(progress.optimal_x)
+            self.complete_found_error.append(progress.optimal_error)
 
             if self.x_description is None:
                 self.x_description = progress.x_description

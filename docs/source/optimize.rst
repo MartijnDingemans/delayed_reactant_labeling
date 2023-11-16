@@ -21,7 +21,11 @@ error between each curve of both datasets.
 .. autoclass:: RateConstantOptimizerTemplate
     :members:
 
-.. autoclass:: OptimizerProgress
+.. autoclass:: OptimizedModel
+    :members:
+
+.. autoclass:: OptimizedMultipleModels
+    :members:
 
 .. _OptimizeExample:
 
@@ -88,13 +92,14 @@ class. To this data we than add noise based on its intensity and a base level of
 
     # visualize
     import matplotlib.pyplot as plt
-    fig, ax = plt.subplots(layout='tight')
+    fig, ax = plt.subplots()
     for col in fake_data.columns[:-1]:
         ax.plot(time_post, real_data[col], color="tab:gray")
         ax.scatter(time_post, fake_data[col], label=col)
     ax.plot(np.nan, np.nan, color="tab:gray", label="real")
     ax.set_xlabel("time")
     ax.set_ylabel("intensity")
+    ax.legend()
     fig.show()
 
 .. image:: images/optimize_fakedata.png
@@ -110,6 +115,7 @@ the data should be analyzed.
 
 .. code-block:: python
 
+    from __future__ import annotations  # required for compatibility with python 3.8
     from delayed_reactant_labeling.predict import DRL
     from delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate
 
@@ -165,16 +171,16 @@ To start optimizing this system we do the following:
     description = ['k1', 'k-1', 'k2']
     bounds = Bounds(np.array([1e-9, 1e-9, 1e-9]), np.array([100, 100, 100]))  #lower bound, upper bound
 
-    RCO = RateConstantOptimizer(experimental=fake_data, metric=METRIC)
+    RCO = RateConstantOptimizer(experimental=fake_data, metric=metric)
     RCO.optimize(
         x0=np.array([1, 1, 1]),
         x_description=description,
         x_bounds=bounds,
         path='./optimization/', _overwrite_log=True)
 
-    progress = RCO.load_optimization_progress('./optimization/')
+    model = RCO.load_optimized_model('./optimization/')
 
-    progress.best_X
+    model.best_X
     # k1,   2.112804e-01
     # k-1,  1.000000e-09
     # k2,   6.424953e-01
@@ -189,14 +195,12 @@ with many different reactions. To analyze multiple runs from different starting 
         n_runs=50,
         x_description=description,
         x_bounds=bounds,
-        n_jobs=-2,
+        n_jobs=-2,  # use all cpu's except one.
     )
 
-    import os
-    error = []
-    bestX = []
-    for file in os.listdir('./optimization_multiple/'):
-        progress = RCO.load_optimization_progress(file)
-        error.append(progress.best_error)
-        best_X.append(progres.best_X)
-    print(bestX[np.array(error).argmin()])
+    from delayed_reactant_labeling.optimize import OptimizedMultipleModels
+    models = OptimizedMultipleModels(path='./optimization_multiple/')
+    print(models.best.optimal_x)
+    # k1     2.112738e-01
+    # k-1    1.000000e-09
+    # k2     6.425392e-01

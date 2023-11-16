@@ -46,7 +46,7 @@ class JSON_log:
             f.write(data.to_json() + "\n")
 
 
-class OptimizerProgress:
+class OptimizedModel:
     """Formatted data structure of an optimized model.
 
     Parameters
@@ -64,15 +64,15 @@ class OptimizerProgress:
         The number of parameters.
     n_iterations : int
         The number of computed iterations.
-    all_X : pd.DataFrame
+    all_x : pd.DataFrame
         The applied parameters for each iteration.
     all_errors : pd.Series
         The error for each iteration.
     all_times : pd.Series
         The timestamp at which the computation of each iteration was finished.
-    best_X : pd.Series
+    optimal_x : pd.Series
         The parameters for the iteration with the lowest error.
-    best_error : float
+    optimal_error : float
         The error corresponding to the iteration with the lowest error.
     simplex : np.ndarray
         An array of size [N + 1, N] corresponding to the N parameters for each of the N + 1 best iterations
@@ -108,21 +108,92 @@ class OptimizerProgress:
         self.n_dimensions = len(self.x_description)
         self.n_iterations = len(df)
 
-        self.all_X: pd.DataFrame = pd.DataFrame(list(df.loc[:, "x"]), columns=self.x_description)
+        self.all_x: pd.DataFrame = pd.DataFrame(list(df.loc[:, "x"]), columns=self.x_description)
         self.all_errors: pd.Series = df["error"]
         self.all_times: pd.Series = df["datetime"]
 
         simplex = np.full((self.n_dimensions + 1, self.n_dimensions), np.nan)
         sorted_errors = self.all_errors.sort_values(ascending=True)
         for n, index in enumerate(sorted_errors[:self.n_dimensions + 1].keys()):
-            simplex[n, :] = self.all_X.iloc[index, :].to_numpy()
+            simplex[n, :] = self.all_x.iloc[index, :].to_numpy()
         self.simplex = simplex
 
         # noinspection PyUnresolvedReferences
         best_iteration_index = sorted_errors.index[0]
 
-        self.best_X: pd.Series = pd.Series(self.all_X.loc[best_iteration_index, :], index=self.x_description)
-        self.best_error: float = self.all_errors[best_iteration_index]
+        self.initial_x: pd.Series = pd.Series(self.all_x.iloc[0, :], index=self.x_description)
+        self.optimal_x: pd.Series = pd.Series(self.all_x.iloc[best_iteration_index, :], index=self.x_description)
+        self.optimal_error: float = self.all_errors[best_iteration_index]
+
+
+class OptimizedMultipleModels:
+    """Formatted data structure for multiple optimized models.
+
+        Parameters
+        ----------
+        path
+            The path to the directory, which contains subdirectories.
+            Each subdirectory in turn should contain the optimization progress corresponding to its model number.
+
+        Attributes
+        ----------
+        x_description : list[str]
+            The description of each parameter.
+        all_initial_x :pd.Series
+            The initial parameters, x, in each model.
+        all_optimal_x : pd.Series
+            The optimal parameters, x, in each model.
+        all_optimal_error : float
+            The error when using the optimal parameters in each model.
+        """
+    def __init__(self, path: str | pathlib.Path):
+        if not isinstance(path, pathlib.Path):
+            path = pathlib.Path(path)
+
+        # Store general information about each model.
+        # This does not contain the model.all_X attribute as those are quite large, and often not used.
+        index = []
+        initial_x = []
+        optimal_x = []
+        found_error = []
+        self._model_paths = []
+        self.x_description = None
+
+        for model_path in tqdm(path.iterdir()):
+            if not model_path.is_dir():
+                continue
+            try:
+                model = OptimizedModel(model_path)
+            except Exception as e:
+                warnings.warn(f'The model at path {model_path} gave the error:\n{repr(e)}')
+                continue
+
+            self._model_paths.append(model_path)
+            index.append(model_path.parts[-1])  # guess_42
+            initial_x.append(model.initial_x)
+            optimal_x.append(model.optimal_x)
+            found_error.append(model.optimal_error)
+
+            if self.x_description is None:
+                self.x_description = model.x_description
+
+        self.all_initial_x = pd.DataFrame(initial_x, index=index, columns=self.x_description)
+        self.all_optimal_x = pd.DataFrame(optimal_x, index=index, columns=self.x_description)
+        self.all_optimal_error = np.array(found_error)
+
+        # store information on the best model
+        best_model_index = np.argsort(self.all_optimal_error)
+        self.best = self.get_model(best_model_index[0])
+
+    def get_model(self, n: int) -> OptimizedModel:
+        """Returns the n-th model.
+
+        Args
+        ----
+        n
+            The index of the model that is to be retrieved.
+        """
+        return OptimizedModel(path=self._model_paths[n])
 
 
 class RateConstantOptimizerTemplate(ABC):
@@ -501,7 +572,7 @@ class RateConstantOptimizerTemplate(ABC):
             pass  # results are stored incase an error occurred due to self.optimize.
 
     @staticmethod
-    def load_optimization_progress(path: str | pathlib.Path) -> OptimizerProgress:
+    def load_optimized_model(path: str | pathlib.Path) -> OptimizedModel:
         """Loads in the data from the log files.
 
         Parameters
@@ -511,7 +582,7 @@ class RateConstantOptimizerTemplate(ABC):
 
         Returns
         -------
-        :class:`OptimizerProgress`
+        :class:`OptimizedModel`
             A structured OptimizerProgress instance which contains all information that was logged.
         """
-        return OptimizerProgress(path)
+        return OptimizedModel(path)
