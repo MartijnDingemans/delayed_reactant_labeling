@@ -132,11 +132,11 @@ class MyTestCase(unittest.TestCase):
         print('DRL Euler')
         ti = perf_counter()
         drl = DRL(rate_constants=rate_constants_ABC, reactions=reactions_ABC, verbose=False, output_order=['A', 'B', 'C'])
-        pred, _ = drl.predict_concentration_Euler(
-            t_eval_pre=time,
-            t_eval_post=np.linspace(0, 1, 10),
-            initial_concentrations={'A': 1},
-            labeled_concentration={},
+        pred = drl.predict_concentration_Euler(
+            t_eval_pre=np.linspace(0, 1, 10),
+            t_eval_post=time,
+            initial_concentrations={},
+            labeled_concentration={'A': 1},
             dilution_factor=1,
         )
         MAPE_A = mean_absolute_percentage_error(y_pred=pred['A'], y_true=kinetic_A)
