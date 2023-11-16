@@ -16,7 +16,7 @@ from delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate
 from delayed_reactant_labeling.predict import DRL
 from delayed_reactant_labeling.visualize import VisualizeMultipleSolutions
 
-NOISE_LEVEL = 0
+NOISE_LEVEL = 0.02
 RATE_CONSTANTS_ROELANT = pd.Series({
     'k1_D': 1.5,
     'k1_E': 0.25,
@@ -309,7 +309,7 @@ def optimize(compounds: list[str], calculate=True, noise_level=NOISE_LEVEL):
             path=path,
             x_description=x_description,
             metadata={'compounds': compounds, 'noise_level': noise_level},
-            n_runs=500,
+            n_runs=100,
             n_jobs=-1,
             x_bounds=bounds,
             maxiter=200000,
@@ -317,7 +317,7 @@ def optimize(compounds: list[str], calculate=True, noise_level=NOISE_LEVEL):
     else:
         plt.show()
         VMS = VisualizeMultipleSolutions(path)
-        x = list(RATE_CONSTANTS_ROELANT.values)
+        x = RATE_CONSTANTS_ROELANT.to_list()
         x_description = list(RATE_CONSTANTS_ROELANT.keys())
         x = np.array(x + [0.025]) if combine_4_5 else np.array(x)
         x_description = x_description + ['ion'] if combine_4_5 else x_description
@@ -361,7 +361,6 @@ def optimize(compounds: list[str], calculate=True, noise_level=NOISE_LEVEL):
 
         for descr, error in errors_real.items():
             out[f'real_{descr}'] = error
-
         return out
 
 
@@ -375,4 +374,5 @@ if __name__ == '__main__':
         df.append(optimize(compounds=items[3:], calculate=False, noise_level=int(items[1])))
 
     df = pd.DataFrame(df)
+    # TODO sort index
     df.to_excel('model_boundaries.xlsx')
