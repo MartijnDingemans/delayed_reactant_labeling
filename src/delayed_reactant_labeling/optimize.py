@@ -217,6 +217,8 @@ class RateConstantOptimizerTemplate(ABC):
 
     def calculate_errors(self, prediction: pd.DataFrame) -> pd.Series:
         """Calculates the (unweighted) error caused by each error function.
+        This is done by calculating the curves corresponding to the prediction,
+        and comparing them with the experimental curves using the metric.
 
         Args
         ----
@@ -260,7 +262,7 @@ class RateConstantOptimizerTemplate(ABC):
         Returns
         -------
         pd.Series
-            The weighed errors
+            The weighted errors
         """
         if self.weights is None:
             weights = np.ones(errors.shape)

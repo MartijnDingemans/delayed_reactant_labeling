@@ -193,9 +193,11 @@ class DRL:
         Args
         ----
         t_eval_pre
-            The time steps, that must be evaluated, before the addition of the labeled compound.
+            The time steps, before the addition of the labeled compound.
+            The first element will be the starting time, and the last the time when it ends.
+            It can be a 2-cell array.
         t_eval_post
-            The time steps, that must be evaluated and returned, after the addition of the labeled compound.
+            The time steps, after the addition of the labeled compound, that must be evaluated.
         initial_concentrations
             The initial concentrations of each chemical.
             Non-zero concentrations are not required.
@@ -203,7 +205,7 @@ class DRL:
             The concentration of the labeled chemical.
             This concentration is not diluted.
         dilution_factor
-            The factor (<= 1) by which the prediction will be 'diluted' when the labeled chemical is added.
+            The factor (≤ 1) by which the prediction will be 'diluted' when the labeled chemical is added.
         atol
             The absolute tolerances for the ODE solver.
         rtol
@@ -212,7 +214,8 @@ class DRL:
         Returns
         -------
         pd.DataFrame
-            The prediction of the concentration as a function of time after the addition of the labeled compound.
+            The predicted concentrations for each time stamp in the t_eval_post array.
+            The time array itself will be appended to the DataFrame.
         """
         # modify the stored initial concentration to match with input.
         for chemical, initial_concentration in initial_concentrations.items():
@@ -294,7 +297,7 @@ class DRL:
         Warning
         -------
         It is less accurate and slower compared to using an ODE solver such as implemented
-        by :meth:`predict_concentration`.
+        for :meth:`predict_concentration`.
 
         Args
         ----
@@ -378,7 +381,8 @@ class DRL:
         return _dc_dt(y, self.reaction_rate, self.reaction_reactants, self.reaction_products)
 
     def calculate_jac(self, _, y):
-        """Calculates the Jacobian for the chemical system.
+        """Calculates the :ref:`Jacobian <Jacobian>` for the chemical system. This function is required by the stiff ODE solvers, such as
+        Radau, in scipy.integrate.solve_ivp.
 
         Args
         ----
