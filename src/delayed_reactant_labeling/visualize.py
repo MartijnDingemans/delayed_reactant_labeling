@@ -266,7 +266,7 @@ class VisualizeSingleSolution:
             n_frames=300,
             fps=30
     ) -> None:
-        import moviepy.video.io.ImageSequenceClip
+        from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 
         n_iter = self.progress.n_iterations
         if n_frames > n_iter:
@@ -309,7 +309,7 @@ class VisualizeSingleSolution:
             fig.tight_layout()
             fig.savefig(file)
 
-        clip = moviepy.video.io.ImageSequenceClip.ImageSequenceClip(files, fps=fps)
+        clip = ImageSequenceClip(files, fps=fps)
         clip.write_videofile(f"{self.path}visualized_rate_over_time.mp4")
 
     def show_rate_sensitivity(self,
