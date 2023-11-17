@@ -86,7 +86,7 @@ class OptimizedModel:
 
         # read the meta data
         self.metadata: dict[str, any] = pd.read_json(path.joinpath("settings_info.json"), lines=True).iloc[0, :]
-        self.x_description = list(self.metadata["x_description"])
+        self.x_description = pd.Index(self.metadata["x_description"])
 
         # read the optimization log
         log_path = path.joinpath("optimization_log.json")
