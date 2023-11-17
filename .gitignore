@@ -10,3 +10,5 @@ pyproject.toml
 /examples/model_boundaries/optimization/
 /examples/docs/optimization/
 /examples/docs/optimization_multiple
+/tests/complete_optimization/images/
+/tests/optimization/

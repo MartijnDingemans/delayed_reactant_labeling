@@ -1,0 +1,1 @@
+{"raw_weights":{},"x0":[1,1,1],"x_description":["k1","k-1","k2"],"bounds":{"keep_feasible":[false,false,false],"lb":[0.000000001,0.000000001,0.000000001],"ub":[100,100,100]},"maxiter":50000,"datetime":"17\/11\/2023 13:50:59"}
