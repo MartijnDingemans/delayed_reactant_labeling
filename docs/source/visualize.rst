@@ -6,7 +6,7 @@ Visualize
 
 .. py:currentmodule:: visualize
 
-.. autoclass:: VisualizeSingleSolution
+.. autoclass:: VisualizeSingleModel
     :members:
 
 .. autoclass:: VisualizeMultipleSolutions

@@ -9,114 +9,177 @@ import pandas as pd
 from tqdm import tqdm
 from delayed_reactant_labeling.predict import InvalidPredictionError
 from delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate, OptimizedModel
+from collections.abc import Iterable
 
 
-class VisualizeSingleSolution:
+class VisualizeSingleModel:
+    """
+    Contains several methods which create plots of the :class:`OptimizedModel<optimize.OptimizedModel>`.
+    Each method will save the figure where the name is equal to the function name.
+
+    Parameters
+    ----------
+    path
+        The path to the folder where the created images should be stored.
+    model
+        The model of which plots should be created.
+    rate_constant_optimizer
+        The user implemented class of :class:`optimize.RateConstantOptimizerTemplate`.
+    plot_title
+        The title (plt.Figure.suptitle) that will be given to each plot.
+        If None (default), no title will be given.
+    hide_params
+        A boolean array, which indicate if the respective parameter should be hidden
+        If None (default), all parameters will be shown.
+    dpi
+        The 'density per inch' that will be used when saving the images.
+    extensions
+        The file format(s) to which the image will be saved.
+    overwrite_image
+        If false (default), an FileExistsError will be raised if the image already exists. 
+        If true, the image will be overwritten.
+        
+    Raises
+    ------
+    FileExistError
+        Raised if the image already exists.
+    """
     def __init__(self,
-                 path: str,
-                 description: str,
+                 path: str | pathlib.Path,
+                 model: OptimizedModel,
                  rate_constant_optimizer: RateConstantOptimizerTemplate,
-                 index_constant_values: Optional[np.ndarray] = None,
-                 isomers: Optional[list[str]] = None,
+                 plot_title: Optional[str] = None,
+                 hide_params: Optional[np.ndarray] = None,
                  dpi: int = 600,
-                 ):
-        self.path = path
-        self.description = description
-        self._best_prediction = None
-        self.rate_constant_optimizer = rate_constant_optimizer
-        self.progress = self.rate_constant_optimizer.load_optimized_model(path)
-        self.isomers = isomers
-        self.index_constant_values = index_constant_values
+                 extensions: Optional[Iterable[str] | str] = None,
+                 overwrite_image: bool = False):
+
+        self.path = path if isinstance(path, pathlib.Path) else pathlib.Path(path)
+        self.path.mkdir(exist_ok=True, parents=True)  # upon image creation we check for duplicates
+        self.model = model
+        self.RCO = rate_constant_optimizer
+        self.plot_title = plot_title
         self.dpi = dpi
+        extensions = [extensions] if isinstance(extensions, str) else extensions  # convert str to list
+        self.extensions = ['png', 'svg'] if extensions is None else extensions
+        self.overwrite_image = overwrite_image
+        self.best_prediction = self.RCO.create_prediction(x=model.optimal_x.values, x_description=model.x_description)
+        self.hide_params = np.zeros(len(model.x_description), dtype=bool) if hide_params is None else hide_params
 
-    @property
-    def best_prediction(self) -> pd.DataFrame:
-        if self._best_prediction is None:
-            # recompute the best prediction so that we can make plots of it.
-            # self.experimental, self._prediction = self.create_prediction(_rate_constants=self.progress.best_rates)
-            self._best_prediction = self.rate_constant_optimizer.create_prediction(
-                x=self.progress.optimal_x.to_numpy(), x_description=self.progress.x_description)
-        return self._best_prediction
+    def _image_exists(self, name):
+        """Raises an FileExistsError if an image already exist"""
+        if self.overwrite_image:
+            return
 
-    def show_error_over_time(self, compound_ratio: Optional[list[str]] = None, compound_ratio_points: int = 100) -> \
-            tuple[plt.Figure, plt.Axes]:
-        """Shows the enantiomeric ratio if compound_ratio is given, and MAE, as a function of the iteration number.
-        The compound ratio must be redetermined for each point in the compound_ratio_points"""
-        # explore the solution
+        for extension in self.extensions:
+            if path := (self.path / f"{name}.{extension.split('.')[-1]}").exists():
+                raise FileExistsError(f'An image already exists! \nPath: {path}\n')
+
+    def _image_save(self, fig, name):
+        fig.suptitle(self.plot_title)
+        for extension in self.extensions:
+            fig.savefig(self.path / f"{name}.{extension.split('.')[-1]}", dpi=self.dpi)  # remove leading .
+
+    def plot_optimization_progress(self,
+                              ratio: Optional[tuple[str, list[str]]] = None,
+                              n_points: int = 100
+                              ) -> tuple[plt.Figure, plt.Axes]:
+        """Shows the error as function of the iteration number.
+
+        Args
+        ----
+        ratio
+            If None (default), only the error ratio will be shown.
+            If given, the first element indicates the chemical of interest, and the second element the chemicals it is
+            compared to. For example ('A', ['A', 'B']), calculates :math:`A / (A+B)`.
+            It will plot the ratio for the last point in each prediction.
+        n_points
+            The number of iterations for which the ratio will be re-calculated.
+            These are uniformly distributed over all possible iterations.
+        """
+        self._image_exists('optimization_progress')
         fig, ax = plt.subplots()
-        ax.scatter(range(1, 1 + len(self.progress.all_errors)), self.progress.all_errors, alpha=0.3)
+        ax.scatter(range(len(self.model.all_errors)), self.model.all_errors, alpha=0.3)
 
-        if compound_ratio is not None:
+        if ratio is not None:
             ax2 = ax.twinx()
             found_ratio = []
-            ratio_sampled = np.linspace(0, len(self.progress.all_x) - 1, compound_ratio_points).round(0).astype(int)
-            for iteration in ratio_sampled:
-                pred = self.rate_constant_optimizer.create_prediction(
-                    x=self.progress.all_x.iloc[iteration, :],
-                    x_description=self.progress.all_x.columns)
-                found_ratio.append((pred[compound_ratio[0]] / pred[compound_ratio[1]].sum(axis=1))[-100:].mean())
+            sample_points = np.linspace(0, len(self.model.all_x) - 1, n_points).round(0).astype(int)
+            for sample in sample_points:
+                pred = self.RCO.create_prediction(
+                    x=self.model.all_x.iloc[sample, :],
+                    x_description=self.model.all_x.columns)
+                found_ratio.append((pred[ratio[0]].iloc[-1] / pred[ratio[1]].iloc[-1, :].sum()).mean())
 
-            ax2.scatter(ratio_sampled, found_ratio, alpha=0.3, color="C1")
+            ax2.scatter(sample_points, found_ratio, alpha=0.3, color="C1")
             ax2.set_ylabel("ratio", color="C1")
 
         ax.set_xlabel("iteration")
-        ax.set_ylabel("sum of MAE", color="C0")
-        ax.set_title(f"{self.description}")
-        fig.savefig(f"{self.path}error_over_time.png", dpi=self.dpi)
-        fig.savefig(f"{self.path}error_over_time.svg", dpi=self.dpi)
+        ax.set_ylabel("error", color="C0")
+        self._image_save(fig, 'optimization_progress')
         return fig, ax
 
-    def show_comparison_with_literature(self,
-                                        desired_k: list[str],
-                                        literature_k: pd.Series) -> tuple[plt.Figure, plt.Axes]:
+    def plot_x(self,
+               *args: pd.Series,
+               file_name: Optional[str] = None,
+               group_as: Optional[list[str]] = None,
+               show_remaining: bool = True,
+               ) -> tuple[plt.Figure, plt.Axes]:
+        """Plots the parameters, x.
+        Args
+        ----
+        *args
+            Parameters that should be compared against the models parameters.
+            If the pd.Series is given a name, this will be used in the legend.
+        file_name
+            The file name for the image. This should not include any extension.
+            If None (default), it is equal to 'plot_x'.
+        group_as
+            Group the parameters by a key.
+            Each parameter can only be matched with one key exactly.
+        show_remaining
+            Show the parameter which were not matched by any key in group_as.
         """
-        Show a comparison between the found rates and some given rates. Rate name should be {k}_{isomer}.
-        :param desired_k: The rate constants that should be shown.
-        :param literature_k: Series containing the constants from literature.
-        :return: Figure, Axes
-        """
-        fig, axs = plt.subplots(3, figsize=(8, 8))
-        for ax, isomer in zip(axs, self.isomers):
-            ax.set_title(f"{isomer}")
+        if file_name is None:
+            file_name = 'plot_x'
+        self._image_exists(file_name)
 
-            rate_found = []
-            rate_lit = []
+        if group_as is None:
+            group_as = ['']
 
-            for k in desired_k:
-                # if a key is not found, it will be replaced by nan, which will not show up in the plot
-                rate_found.append(self.progress.optimal_x.get(f"{k}_{isomer}", np.nan))
-                rate_lit.append(literature_k.get(f"{k}_{isomer}", np.nan))
+        data = [self.model.optimal_x]
+        index = ['model']
+        x_description = self.model.optimal_x.index
+        for n, arg in enumerate(args):  # contain the same input
+            assert set(arg.index) == set(x_description)
+            data.append(arg)
+            index.append(arg.name if not None else n+1)
+        data = pd.DataFrame(data, index=index, columns=x_description)  # aligns the data
 
-            x = np.arange(len(rate_found))
-            multiplier = -0.5
-            width = 0.4
-            max_val = max([max(rate_found), max(rate_lit)])
-            settings = {"ha": "center", "fontweight": "bold"}
-            for vals, descr in zip([rate_found, rate_lit], ["found", "lit."]):
-                ax.bar(x + width * multiplier,
-                       vals,
-                       width,
-                       label=descr)
-                for val, val_x in zip(vals, x + width * multiplier):
-                    if val > 0.005:
-                        form = f"{val:.3f}"
-                    else:
-                        form = f"{val:.0e}"
+        key_hits = []
+        for key in group_as:
+            key_hits.append(x_description.str.contains(key))
+        key_hits = pd.DataFrame(key_hits, columns=x_description, index=group_as)
+        total_hits = key_hits.sum(axis=0)
 
-                    if val < 0.5 * max_val:
-                        ax.text(val_x, val + 0.02 * max_val, form, color="k", **settings)
-                    else:
-                        ax.text(val_x, val - 0.09 * max_val, form, color="w", **settings)
-                multiplier += 1
+        if any(total_hits > 1):
+            raise ValueError(f'An item was matched by multiple keys.\n{total_hits.index[total_hits>1]}')
 
-            ax.set_xticks(x, desired_k, rotation=90, fontsize="small")
-        axs[-1].legend()
-        fig.suptitle(f"{self.description}")
-        fig.supylabel("rate constant intensity")
+        if show_remaining and any(total_hits == 0):
+            key_hits = pd.concat([key_hits, (total_hits == 0).to_frame('other').T])
+
+        fig, axs = plt.subplots(len(key_hits), 1, squeeze=False)
+        for ax, (group_key, selected_x) in zip(axs.flatten(), key_hits.iterrows()):
+            ax.set_ylabel(group_key)
+            data.loc[:, selected_x].T.plot.bar(ax=ax)
+
+        for ax in axs.flatten()[1:]:
+            ax.get_legend().remove()
+        fig.supylabel('intensity')
         fig.tight_layout()
-        fig.savefig(f"{self.path}comparison_with_literature.png", dpi=self.dpi)
-        fig.savefig(f"{self.path}comparison_with_literature.svg", dpi=self.dpi)
+        self._image_save(fig, file_name)
         return fig, axs
+
 
     def show_optimization_path_in_pca(self, create_3d_video: bool = False, fps: int = 30) -> tuple[
             plt.Figure, list[plt.Axes]]:
@@ -142,11 +205,11 @@ class VisualizeSingleSolution:
         ax_pc0 = fig.add_subplot(gs[1, 1])
         ax_pc1 = fig.add_subplot(gs[0, 0])
 
-        x = np.arange(sum(~self.index_constant_values))
-        xticks = self.progress.x_description[~self.index_constant_values]
+        x = np.arange(sum(~self.hide_params))
+        xticks = self.progress.x_description[~self.hide_params]
 
-        ax_pc0.bar(x, pca.components_[0][~self.index_constant_values])
-        ax_pc1.barh(x, pca.components_[1][~self.index_constant_values])
+        ax_pc0.bar(x, pca.components_[0][~self.hide_params])
+        ax_pc1.barh(x, pca.components_[1][~self.hide_params])
 
         ax_pc0.set_xlabel(f"component 0, explained variance {pca.explained_variance_ratio_[0]:.2f}")
         ax_pc0.set_xticks(x, xticks, rotation=90, fontsize="small")
@@ -274,7 +337,7 @@ class VisualizeSingleSolution:
 
         fig, (ax_rates, ax_error) = plt.subplots(2)
 
-        ticks = self.progress.all_x.columns[~self.index_constant_values]
+        ticks = self.progress.all_x.columns[~self.hide_params]
         x = np.arange(len(ticks))
 
         ax_error.set_xlim(0, n_iter - 1)
@@ -290,7 +353,7 @@ class VisualizeSingleSolution:
             # rate plot
             rates = self.progress.all_x.loc[i, :]
             ax_rates.clear()
-            ax_rates.bar(x, rates.iloc[self.index_constant_values])
+            ax_rates.bar(x, rates.iloc[self.hide_params])
 
             ax_rates.set_xticks(x, ticks, rotation=90, fontsize="small")
             ax_rates.set_ylabel("k")
@@ -321,11 +384,11 @@ class VisualizeSingleSolution:
 
         x_value = np.logspace(lower_power, upper_power, steps)
 
-        ticks = self.progress.optimal_x[~self.index_constant_values]
+        ticks = self.progress.optimal_x[~self.hide_params]
         errors = np.full((len(x_value), len(ticks)), np.nan)
 
         # loop over all non-constant values and adjust those
-        for col, key in enumerate(tqdm(self.progress.optimal_x[~self.index_constant_values].keys())):
+        for col, key in enumerate(tqdm(self.progress.optimal_x[~self.hide_params].keys())):
             for row, adjusted_x in enumerate(x_value):
                 # insert all values into the plot
                 best_X = self.progress.optimal_x.copy()

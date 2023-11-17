@@ -26,14 +26,14 @@ class JSON_log:
         if mode == "new":
             # create a new file
             if exists:
-                raise FileExistsError(f"{path} already exists. To replace it use mode='replace'")
+                raise FileExistsError(f"{path} already exists.")
             with open(self._path, "w") as _:
                 pass
 
         elif mode == "append":
             # append to the file
             if not exists:
-                raise ValueError(f"{path} does not exist. Use mode='new' to create it.")
+                raise ValueError(f"{path} does not exist.")
 
         elif mode == "replace":
             # replace the file
@@ -347,7 +347,7 @@ class RateConstantOptimizerTemplate(ABC):
         return errors * self.weights
 
     def calculate_total_error(self, errors: pd.Series) -> float:
-        """Weighs and sums the errors. NaN values are not skipped.
+        """Weighs and sums the errors.
 
         Args
         ----
@@ -384,6 +384,7 @@ class RateConstantOptimizerTemplate(ABC):
             The scipy.optimize.bounds of each parameter.
         path
             The path to the folder where the optimization progress should be stored.
+            The entire path to the folder will be created if it did not exist.
         metadata
             The metadata that should be saved alongside the solution.
             This data will be stored in the settings_info.json file.
@@ -409,6 +410,7 @@ class RateConstantOptimizerTemplate(ABC):
 
         if not isinstance(path, pathlib.Path):
             path = pathlib.Path(path)
+        path.mkdir(exist_ok=True, parents=True)
 
         # enable logging of all information retrieved from the system
         log_path = path.joinpath(f'optimization_log.json')
