@@ -7,12 +7,11 @@ from delayed_reactant_labeling.predict import DRL
 from delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate
 import pandas as pd
 from scipy.optimize import Bounds
-from icecream import ic
 
 reactions = [
-    ('k1', ['A', 'cat'], ['B'],),
-    ('k-1', ['B'], ['A', 'cat'],),
-    ('k2', ['B'], ['C', 'cat']),
+    ('k1', ['A-blank', 'cat'], ['B-blank'],),
+    ('k-1', ['B-blank'], ['A-blank', 'cat'],),
+    ('k2', ['B-blank'], ['C-blank', 'cat']),
 
     # labeled
     ('k1', ['A-d10', 'cat'], ['B-d10'],),
@@ -21,7 +20,7 @@ reactions = [
 ]
 
 # look at as simple of a system as possible.
-concentration_initial = {'A': 1, 'cat': 1 / 5}
+concentration_initial = {'A-blank': 1, 'cat': 1 / 5}
 concentration_labeled = {'A-d10': 1}
 dilution_factor = 1
 time_pre = np.linspace(0, 10, 50)
@@ -75,8 +74,8 @@ class RateConstantOptimizer(RateConstantOptimizerTemplate):
     def calculate_curves(data: pd.DataFrame) -> dict[str, np.ndarray]:
         curves = {}
         for chemical in ['A', 'B', 'C']:
-            chemical_sum = data[[chemical, f'{chemical}-d10']].sum(axis=1)
-            curves[f'ratio_{chemical}'] = (data[chemical] / chemical_sum).to_numpy()
+            chemical_sum = data[[f'{chemical}-blank', f'{chemical}-d10']].sum(axis=1)
+            curves[f'ratio_{chemical}'] = (data[f'{chemical}-blank'] / chemical_sum).to_numpy()
         return curves
 
 

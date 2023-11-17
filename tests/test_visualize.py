@@ -1,4 +1,3 @@
-import pandas as pd
 import pathlib
 import shutil
 
@@ -8,7 +7,7 @@ from pytest import raises
 
 from delayed_reactant_labeling.optimize import OptimizedModel
 from delayed_reactant_labeling.visualize import VisualizeSingleModel
-from test_optimize import RCO
+from test_optimize import RCO, fake_data
 
 # remove all prior images to make sure that we recreate them!
 image_folder = pathlib.Path('./complete_optimization/images')
@@ -21,6 +20,19 @@ image_folder.mkdir()
 #     x_bounds=bounds,
 #     path='./complete_optimization/')
 model = OptimizedModel('./complete_optimization')
+
+
+@pytest.fixture
+def VMS_fixture():
+    return VisualizeSingleModel(
+        path=image_folder,
+        model=model,
+        rate_constant_optimizer=RCO,
+        plot_title='overwritten!',
+        hide_params=None,
+        dpi=100,
+        extensions='.png',
+        overwrite_image=True)
 
 
 def test_extensions():
@@ -46,16 +58,45 @@ class VSMHelper:
         self.VSM = VSM
 
     def plot_optimization_progress(self):
-        return self.VSM.plot_optimization_progress(ratio=('A', ['A', 'B', 'C']), n_points=10)
+        return self.VSM.plot_optimization_progress(ratio=('A-blank', ['A-blank', 'B-blank', 'C-blank']), n_points=10)
 
-    def plot_x(self):
-        return self.VSM.plot_x(pd.Series([0.8, 0.4, 0.67], index=['k-1', 'k1', 'k2'], name='fake1'),
-                               pd.Series([0.6, 0.3, 0.87], index=['k2', 'k1', 'k-1'], name='fake2'),
-                               group_as=['k-'], )
+    def plot_grouped_by(self):
+        # plot x variant
+        return self.VSM.plot_grouped_by(
+            self.VSM.model.optimal_x.rename('model'),
+            pd.Series([0.8, 0.4, 0.67], index=['k-1', 'k1', 'k2'], name='fake1'),
+            pd.Series([0.6, 0.3, 0.87], index=['k2', 'k1', 'k-1'], name='fake2'),
+            group_as=['k-'], file_name='plot_x', xtick_rotation=90)
+
+    def plot_grouped_by_error(self):
+        pred = self.VSM.RCO.create_prediction(x=self.VSM.model.optimal_x.values,
+                                              x_description=self.VSM.model.optimal_x.index.tolist())
+        errors = self.VSM.RCO.calculate_errors(pred)
+        weighed_errors = self.VSM.RCO.weigh_errors(errors)
+        fig, axs = self.VSM.plot_grouped_by(
+            weighed_errors.rename('model'),
+            pd.Series([0.01, 0.15, 0.01], index=['ratio_A', 'ratio_C', 'ratio_B'], name='fake1'),
+            group_as=['A'], file_name='plot_error')
+        axs[0].set_title(weighed_errors.sum().round(4))
+        fig.tight_layout()
+        self.VSM.save_image(fig, 'plot_error')
+
+    def plot_path_in_pca(self):
+        return self.VSM.plot_path_in_pca()
+
+    def plot_enantiomer_ratio(self):
+        return self.VSM.plot_enantiomer_ratio(
+            group_as=['A', 'B', 'C'],
+            ratio_of=['-blank', '-d10'],
+            experimental=fake_data,
+            prediction=RCO.create_prediction(model.optimal_x.values, model.optimal_x.index.tolist())
+        )
 
     def __iter__(self):
         """yields each implemented function"""
+        print('\ntesting function:')
         for method in methods_implemented:
+            print(method)
             yield getattr(self, method)
 
 
@@ -64,16 +105,17 @@ methods_implemented = [method for method in dir(VSMHelper) if method.startswith(
 
 
 def test_all_methods_implemented():
-    methods_available = [method for method in dir(VisualizeSingleModel) if method.startswith('_') is False]
-    assert set(methods_available) == set(methods_implemented)
+    methods_available = []
+    blacklisted_methods = ['save_image']
+    for method in dir(VisualizeSingleModel):
+        if method.startswith('_') is False and method not in blacklisted_methods:
+            methods_available.append(method)
+
+    lacks_n_methods = set(methods_available) - set(methods_implemented)
+    assert len(lacks_n_methods) == 0
 
 
 def test_optimization_progress_empty_folder():
-    def test_L_increases(_func):
-        print(_func)
-        _func()
-        assert len(list(image_folder.rglob('*.png'))) == n + 1
-
     VSM_overwrite = VisualizeSingleModel(
         path=image_folder,
         model=model,
@@ -85,10 +127,10 @@ def test_optimization_progress_empty_folder():
         overwrite_image=True)
 
     assert len(list(image_folder.rglob('*.png'))) == 0
-    print('\ntesting function:')
     for n, func in enumerate(VSMHelper(VSM_overwrite)):
         # assert that image was saved because the amount of items would have been increased by 1.
-        test_L_increases(func)
+        func()
+        assert len(list(image_folder.rglob('*.png'))) == n + 1
     assert len(list(image_folder.rglob('*.png'))) == len(list(methods_implemented))
 
 
@@ -125,29 +167,5 @@ def test_overwriting():
         func()
     assert L == list(image_folder.rglob('*.png'))
 
-
-@pytest.fixture
-def VMS_fixture():
-    return VisualizeSingleModel(
-        path=image_folder,
-        model=model,
-        rate_constant_optimizer=RCO,
-        plot_title='overwritten!',
-        hide_params=None,
-        dpi=100,
-        extensions='.png',
-        overwrite_image=True)
-
-
-def test_plot_x(VMS_fixture):
-    VMS_fixture.plot_x(pd.Series([0.8, 0.4, 0.67], index=['k-1', 'k1', 'k2'], name='fake1'),
-                       pd.Series([0.6, 0.3, 0.87], index=['k2', 'k1', 'k-1'], name='fake2'),
-                       group_as=['k-'], file_name='usecase1')
-
-    VMS_fixture.plot_x(pd.Series([0.8, 0.4, 0.67], index=['k-1', 'k1', 'k2'], name='fake1'),
-                       pd.Series([0.6, 0.3, 0.87], index=['k2', 'k1', 'k-1'], name='fake2'),
-                       group_as=['k1', 'k2'], show_remaining=False, file_name='usecase2')
-
-    VMS_fixture.plot_x(pd.Series([0.8, 0.4, 0.67], index=['k-1', 'k1', 'k2'], name='fake1'),
-                       pd.Series([0.6, 0.3, 0.87], index=['k2', 'k1', 'k-1'], name='fake2'),
-                       file_name='usecase3')
+def test_plot_path_in_pca(VMS_fixture):
+    VMS_fixture.plot_path_in_pca(PC1=1, PC2=2, file_name='pca_usecase1')
