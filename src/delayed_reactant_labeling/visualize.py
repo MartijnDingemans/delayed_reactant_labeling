@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-import os
 import pathlib
 import warnings
 from collections.abc import Iterable
 from typing import Optional
 
 import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm, Normalize
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
 from tqdm import tqdm
+
 
 from delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate, OptimizedModel
 from delayed_reactant_labeling.predict import InvalidPredictionError
@@ -323,6 +324,7 @@ class VisualizeSingleModel:
         self._image_exists(file_name)
 
         fig, ax = plt.subplots()
+
         def analyze_data(data: pd.DataFrame, marker, descr):
             for group_n, group in enumerate(group_as):
                 grouped_data = data.loc[:, data.columns.str.contains(group)]
@@ -362,107 +364,118 @@ class VisualizeSingleModel:
         self.save_image(fig, file_name)
         return fig, ax
 
-    def animate_rate_over_time(
+    def plot_rate_over_time(
             self,
-            n_frames=300,
-            fps=30
-    ) -> None:
-        from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
+            file_name: Optional[str] = None,
+            x_min: Optional[float] = None,
+            x_max: Optional[float] = None,
+            log_scale: bool = False) -> tuple[plt.Figure, plt.Axes]:
+        """Plots the parameters, x, as a function of time.
 
-        n_iter = self.progress.n_iterations
-        if n_frames > n_iter:
-            raise ValueError("specified to analyze more frames than available iterations")
+        Args
+        ----
+        file_name
+            The file name for the image. This should not include any extension.
+            If None (default), it is equal to 'plot_path_in_pca'.
+        x_min
+            Plot values lower than the min as the min.
+        x_max
+            Plot values lwoer than the max as the max.
+        log_scale
+            If true the data will be plotted on log_scale.
+        """
+        if file_name is None:
+            file_name = 'plot_rate_over_time'
+        self._image_exists(file_name)
 
-        fig, (ax_rates, ax_error) = plt.subplots(2)
+        if x_min is None:
+            x_min = self.model.all_x.to_numpy().min()
 
-        ticks = self.progress.all_x.columns[~self.hide_params]
-        x = np.arange(len(ticks))
+        if x_max is None:
+            x_max = self.model.all_x.to_numpy().max()
 
-        ax_error.set_xlim(0, n_iter - 1)
-        files = []
-        files_folder = f"{self.path}/animation_rate_over_time"
-        try:
-            os.makedirs(files_folder)
-        except FileExistsError:
-            print("Already a folder containing the pca_rotation exists. skipping...")
-            return None
+        if log_scale:
+            norm = LogNorm(vmin=x_min, vmax=x_max)
+        else:
+            norm = Normalize(vmin=x_min, vmax=x_max)
+        fig, ax = plt.subplots()
+        im = ax.imshow(self.model.all_x.T, aspect='auto', label='intensity', norm=norm)
+        fig.colorbar(im)
+        ax.set_yticks(np.arange(self.model.x_description.shape[0]), self.model.x_description.tolist())
+        ax.set_xlabel('iteration')
+        self.save_image(fig, file_name)
+        return fig, ax
 
-        for i in tqdm(np.linspace(0, n_iter - 1, n_frames).round().astype(int)):
-            # rate plot
-            rates = self.progress.all_x.loc[i, :]
-            ax_rates.clear()
-            ax_rates.bar(x, rates.iloc[self.hide_params])
+    def plot_rate_sensitivity(self,
+                              x_min: float,
+                              x_max: float,
+                              file_name: Optional[str] = None,
+                              max_error: Optional[float] = None,
+                              steps: int = 101) -> (plt.Figure, plt.Axes):
+        """Plot the sensitivity of each parameter, x, to modifications. Only a single parameter is modified at once.
 
-            ax_rates.set_xticks(x, ticks, rotation=90, fontsize="small")
-            ax_rates.set_ylabel("k")
-            ax_rates.legend(loc=1)
-            ax_rates.set_title("found rate")
+        Args
+        ----
+        x_min
+            The minimum value for x.
+        x_max
+            The maximum value for x
+        file_name
+            The file name for the image. This should not include any extension.
+            If None (default), it is equal to 'plot_path_in_pca'.
+        max_error
+            All values larger the maximum value will be plotted as the maximum error.
+            If None (default), 3 times the lowest value error will be used.
+        steps
+            The number of different values that will be modeled for each parameter.
+        """
+        if file_name is None:
+            file_name = 'plot_rate_sensitivity'
+        self._image_exists(file_name)
 
-            # update the error plot
-            ax_error.scatter(i, self.progress.all_errors[i], color="tab:blue")
-
-            ax_error.set_xlabel("iteration")
-            ax_error.set_ylabel("MAE", color="tab:blue")
-            fig.suptitle(f"{self.description}")
-
-            file = f"{files_folder}/frame_{i}.jpg"
-            files.append(file)
-            fig.tight_layout()
-            fig.savefig(file)
-
-        clip = ImageSequenceClip(files, fps=fps)
-        clip.write_videofile(f"{self.path}visualized_rate_over_time.mp4")
-
-    def show_rate_sensitivity(self,
-                              lower_power: int = -6,
-                              upper_power: int = 2,
-                              steps: int = 101,
-                              threshold=3) -> (plt.Figure, plt.Axes):
         from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-        x_value = np.logspace(lower_power, upper_power, steps)
+        x_value = np.geomspace(x_min, x_max, steps)
 
-        ticks = self.progress.optimal_x[~self.hide_params]
+        ticks = self.model.optimal_x[~self.hide_params]
         errors = np.full((len(x_value), len(ticks)), np.nan)
 
         # loop over all non-constant values and adjust those
-        for col, key in enumerate(tqdm(self.progress.optimal_x[~self.hide_params].keys())):
+        for col, key in enumerate(tqdm(self.model.optimal_x[~self.hide_params].keys())):
             for row, adjusted_x in enumerate(x_value):
                 # insert all values into the plot
-                best_X = self.progress.optimal_x.copy()
+                best_X = self.model.optimal_x.copy()
                 best_X[key] = adjusted_x
                 try:
-                    prediction = self.rate_constant_optimizer.create_prediction(
-                        x=best_X.to_numpy(), x_description=self.progress.x_description)
-                    unweighed_error = self.rate_constant_optimizer.calculate_errors(prediction)
-                    found_error = self.rate_constant_optimizer.calculate_total_error(unweighed_error)
+                    prediction = self.RCO.create_prediction(
+                        x=best_X.to_numpy(), x_description=self.model.x_description)
+                    unweighed_error = self.RCO.calculate_errors(prediction)
+                    found_error = self.RCO.calculate_total_error(unweighed_error)
                 except InvalidPredictionError:
                     found_error = np.nan
                 errors[row, col] = found_error
 
-        min_error = np.nanmin(errors)
-        errors[errors > threshold * min_error] = threshold * min_error
-
         fig, ax = plt.subplots()
-        im = ax.imshow(errors, origin="lower", aspect="auto")
+        if max_error is None:
+            max_error = np.nanmin(errors) * 3
+        im = ax.imshow(errors, origin="lower", aspect="auto", norm=Normalize(vmax=max_error))
 
         ax.set_xticks(np.arange(len(ticks)), ticks.index, fontsize="small")
         ax.tick_params(axis='x', rotation=45)
 
-        n_orders_of_magnitude = int(upper_power - lower_power + 1)
-        ind = np.linspace(0, len(x_value) - 1, n_orders_of_magnitude)  # .round(0).astype(int)
-        yticks = [f"{y:.0e}" for y in np.logspace(lower_power, upper_power, n_orders_of_magnitude)]
+        min_x_power = np.log10(x_min).round(0).astype(int)
+        max_x_power = np.log10(x_max).round(0).astype(int)
+
+        n_orders_of_magnitude = max_x_power - min_x_power + 1
+        ind = np.linspace(0, len(x_value) - 1, n_orders_of_magnitude).round(0).astype(int)
+        yticks = [f"{y:.0e}" for y in np.logspace(min_x_power, max_x_power, n_orders_of_magnitude)]
         ax.set_yticks(ind, yticks)
         ax.set_ylabel("adjusted value")
 
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", "5%", pad="3%")
         fig.colorbar(im, cax=cax, label="MAE")
-        ax.set_title(f"{self.description}")
-        fig.tight_layout()
-        fig.savefig(f"{self.path}sensitivity_of_rate.png", dpi=self.dpi)
-        fig.savefig(f"{self.path}sensitivity_of_rate.svg", dpi=self.dpi)
-
+        self.save_image(fig, file_name)
         return fig, ax
 
 

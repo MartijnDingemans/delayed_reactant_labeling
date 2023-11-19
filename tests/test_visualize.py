@@ -23,7 +23,7 @@ model = OptimizedModel('./complete_optimization')
 
 
 @pytest.fixture
-def VMS_fixture():
+def VSM_fixture():
     return VisualizeSingleModel(
         path=image_folder,
         model=model,
@@ -33,6 +33,10 @@ def VMS_fixture():
         dpi=100,
         extensions='.png',
         overwrite_image=True)
+
+
+# def test_new_method(VSM_fixture):
+#     VSM_fixture.plot_rate_over_time()
 
 
 def test_extensions():
@@ -92,12 +96,18 @@ class VSMHelper:
             prediction=RCO.create_prediction(model.optimal_x.values, model.optimal_x.index.tolist())
         )
 
+    def plot_rate_over_time(self):
+        return self.VSM.plot_rate_over_time(log_scale=True, x_min=1e-4)
+
+    def plot_rate_sensitivity(self):
+        return self.VSM.plot_rate_sensitivity(x_min=3e-6, x_max=5e1, max_error=self.VSM.model.optimal_error*5)
+
     def __iter__(self):
-        """yields each implemented function"""
+        """iterate over each implemented function"""
         print('\ntesting function:')
         for method in methods_implemented:
             print(method)
-            yield getattr(self, method)
+            yield getattr(self, method)  # x.method
 
 
 # outside the function, so we can loop over the implemented methods in different functions
@@ -167,5 +177,6 @@ def test_overwriting():
         func()
     assert L == list(image_folder.rglob('*.png'))
 
-def test_plot_path_in_pca(VMS_fixture):
-    VMS_fixture.plot_path_in_pca(PC1=1, PC2=2, file_name='pca_usecase1')
+
+def test_plot_path_in_pca(VSM_fixture):
+    VSM_fixture.plot_path_in_pca(PC1=1, PC2=2, file_name='pca_usecase1')
