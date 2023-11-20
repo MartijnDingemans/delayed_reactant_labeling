@@ -153,7 +153,7 @@ class VisualizeSingleModel:
                         show_remaining: bool = True,
                         xtick_rotation: float = 0
                         ) -> tuple[plt.Figure, plt.Axes]:
-        """Plots the data in *args, and allows easy grouping with respect to their index.
+        """Plots the data in args, and allows easy grouping with respect to their index.
 
         Args
         ----
@@ -299,7 +299,7 @@ class VisualizeSingleModel:
                               ) -> tuple[plt.Figure, plt.Axes]:
         """Groups the data (experimental or predicted), and calculates the fraction each chemical contributes to the
         total sum. E.g. group_as=['1', '2'] and ratio_of=['A', 'B', 'C'] would look for hits with respect to those keys,
-        and one of the calculated data points would be: 1-A / (1-A + 1-B + 1-C)
+        and one of the calculated data points would be: 1_A / (1_A + 1_B + 1_C)
 
         Args
         ----
