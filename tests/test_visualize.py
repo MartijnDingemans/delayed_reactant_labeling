@@ -41,7 +41,7 @@ def VSM_fixture():
 
 def test_extensions():
     path_extensions = pathlib.Path('./complete_optimization/extensions/')
-    for extensions in ['.png', 'png', ('png', '.jpg'), {'.png', 'jpg'}]:
+    for extensions in ['.png', 'png', ('png', '.svg'), {'.png', 'svg'}]:
         VSM = VisualizeSingleModel(
             path=path_extensions,
             model=model,
@@ -100,7 +100,7 @@ class VSMHelper:
         return self.VSM.plot_rate_over_time(log_scale=True, x_min=1e-4)
 
     def plot_rate_sensitivity(self):
-        return self.VSM.plot_rate_sensitivity(x_min=3e-6, x_max=5e1, max_error=self.VSM.model.optimal_error*5)
+        return self.VSM.plot_rate_sensitivity(x_min=1e-6, x_max=1e1, max_error=self.VSM.model.optimal_error*5, steps=11)
 
     def __iter__(self):
         """iterate over each implemented function"""
@@ -165,9 +165,9 @@ def test_overwriting():
         path=image_folder,
         model=model,
         rate_constant_optimizer=RCO,
-        plot_title='overwritten!',
+        plot_title='',
         hide_params=None,
-        dpi=100,
+        dpi=300,
         extensions='.png',
         overwrite_image=True)
 

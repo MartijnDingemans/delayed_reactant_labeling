@@ -4,13 +4,13 @@ Extensive example
 Roelant et al. (`link <https://onlinelibrary.wiley.com/doi/full/10.1002/anie.202205720>`_, `DOI: doi/10.1002/anie.202205720`)
 used DRL to analyze a reaction with the following mechanism:
 
-.. image:: images/extensive_example_roelant_mechanism.png
+.. image:: images/extensive_example/roelant_mechanism.png
     :width: 400
     :align: center
 
 There are 3 isomers per intermediate in this reaction:
 
-.. image:: images/extensive_example_roelant_isomers.jpeg
+.. image:: images/extensive_example/roelant_isomers.jpeg
     :width: 800
     :align: center
 
@@ -57,7 +57,7 @@ First we import the required modules, and show the original data around the time
     ax.set_yscale('log')
     fig.show()
 
-.. image:: images/extensive_example_overview.png
+.. image:: images/extensive_example/overview.png
     :width: 600
     :align: center
 
@@ -86,7 +86,7 @@ be present. We can correct our data according for these two factors as follows:
     experimental = experimental_complete.loc[index_labeled_addition:, :]
     time = experimental['time (min)'].to_numpy()
 
-.. image:: images/extensive_example_corrected.png
+.. image:: images/extensive_example/overview_corrected.png
     :width: 600
     :align: center
 
@@ -117,7 +117,7 @@ Furthermore, the type of error (MAE, MAPE, RMSE) can be defined here.
     ax2.set_ylim(bottom=0)
     fig.show()
 
-.. image:: images/extensive_example_metric_weights.png
+.. image:: images/extensive_example/metric_weights.png
     :width: 600
     :align: center
 
@@ -176,8 +176,8 @@ up extract :math:`k_2` from :eq:`3t`. In code this is done as follows:
 
         # show best fit
         fig, axs = plt.subplots(2, 1)
-        fig.suptitle(chemical)
         ax = axs[0]
+        ax.set_title(chemical)
         ax.plot(time, f(result.x[0]), label=f'MAE: {result.fun:.4f}', color='tab:orange')
         ax.scatter(time[:-EQUILIBRIUM_LAST_N], y_true_curve[:-EQUILIBRIUM_LAST_N],s=1, marker='.', color='tab:blue', label='DRL')
         ax.scatter(time[-EQUILIBRIUM_LAST_N:], y_true_curve[-EQUILIBRIUM_LAST_N:],s=1, marker='.', color='tab:green', label='DRL-eq')
@@ -198,9 +198,10 @@ up extract :math:`k_2` from :eq:`3t`. In code this is done as follows:
         ax.set_xlabel('value of rate constant')
         ax.set_ylabel('MAE')
         ax.legend()
+        fig.tight_layout()
         fig.show()
 
-.. image:: images/extensive_example_kinetics.png
+.. image:: images/extensive_example/kinetics.png
     :width: 600
     :align: center
 
@@ -218,7 +219,7 @@ its backwards reaction.
 .. code-block:: python
 
     REACTIONS_ONEWAY = []
-    for label in ["", LABEL]:
+    for label in ['', LABEL]:
         REACTIONS_ONEWAY.extend([
             ("k1_D", ["cat", f"2{label}", ], [f"3D{label}", ]),
             ("k1_E", ["cat", f"2{label}", ], [f"3E{label}", ]),
@@ -259,10 +260,10 @@ drastically decreased because of the large amount of noise in this data.
 
 .. code-block:: python
 
-    from __future__ import annotations
+    from __future__ import annotations  # compatibility with 3.8
     WEIGHTS = {
-        "label_": 1,
-        "isomer_": 0.5,
+        "ratio_label": 1,
+        "ratio_isomer": 0.5,
         "TIC": 0.2,
         "iso_F": 0.25,
     }
@@ -313,13 +314,13 @@ drastically decreased because of the large amount of noise in this data.
 
                     sum_chemical = data[[chemical, f"{chemical}'"]].sum(axis=1)
 
-                    curves[f"label_{chemical_iso_split}"] = (  # 3D / (3D+3D')
+                    curves[f"ratio_label_{chemical_iso_split}"] = (  # 3D / (3D+3D')
                         data[chemical] / sum_chemical).to_numpy()
-                    curves[f"isomer_{chemical_iso_split}"] = (  # 3D / (3D+3E+3F)
+                    curves[f"ratio_isomer_{chemical_iso_split}"] = (  # 3D / (3D+3E+3F)
                         data[chemical] / sum_all_isomers).to_numpy()
-                    curves[f"TIC_{chemical_iso_split}"] = (  # normalized TIC curve
+                    curves[f"TIC-normal_{chemical_iso_split}"] = (  # normalized TIC curve
                             data[chemical] / sum_chemical.iloc[-100:].mean()).to_numpy()
-                    curves[f"TIC_{chemical_iso_split}'"] = (  # normalized TIC curve
+                    curves[f"TIC-labeled_{chemical_iso_split}"] = (  # normalized TIC curve
                             data[f"{chemical}'"] / sum_chemical.iloc[-100:].mean()).to_numpy()
             return curves
 
@@ -370,7 +371,7 @@ To optimize the model we need to first define the bounds and starting position o
     vertex = constraints["vertex"].to_numpy()
     bounds = Bounds(constraints['lower'].to_numpy(), constraints['upper'].to_numpy())
 
-We can than optimize the system once like this:
+We can optimize the system once like this:
 
 .. code-block:: python
 
@@ -380,7 +381,7 @@ We can than optimize the system once like this:
         x_description=dimension_descriptions,
         x_bounds=bounds,
         path=path,
-        maxiter=50000,  # this might take a while! 34378 iterations on my machine in 17 minutes
+        maxiter=50000,  # this might take a while ...
     )
 
 Or multiple times:
@@ -398,19 +399,125 @@ Or multiple times:
 
 Visualize
 ---------
-We can visualize the curves that are used for the caluclation of the error as follows:
+The :class:`visualize.VisualizeSingleModel` can be used to make various kinds of plots:
+
+.. code-block:: python
+
+    from delayed_reactant_labeling.optimize import OptimizedModel
+    from delayed_reactant_labeling.visualize import VisualizeSingleModel
+
+    model  = OptimizedModel('./optimization/')
+    VSM = VisualizeSingleModel(
+        path='./images/',
+        model=model,
+        rate_constant_optimizer=RCO,
+        hide_params=constraints['upper']==0,
+        extensions=['.png', 'svg'])  # having a leading . does not matter
+
+    VSM.plot_optimization_progress(ratio=['6D', ['6D', '6E']])
+    VSM.plot_path_in_pca(PC1=0, PC2=1)
+
+.. image:: images/extensive_example/plot_optimization_progress.png
+    :width: 600
+    :align: center
+
+.. image:: images/extensive_example/plot_path_in_pca.png
+    :width: 600
+    :align: center
+
+Most of the found rate constants are similar in size to those found by Roelant. However, the backwards
+reactions seem to have a large difference.
+
+.. code-block:: python
+
+    rate_constants_roelant = pd.Series({
+        'k1_D': 1.5,    'k1_E': 0.25,   'k1_F': 0.01,
+        'k2_D': 0.43,   'k2_E': 0.638,  'k2_F': 0.567,
+        'k3_D': 0.23,   'k3_E': 0.35,   'k3_F': 0.3,
+        'k4_D': 8,      'k4_E': 0.05,   'k4_F': 0.03,
+        'k-1_D': 0,     'k-1_E': 0,     'k-1_F': 0,
+        'k-2_D': 0.025, 'k-2_E': 0.035, 'k-2_F': 0.03,
+        'k-3_D': 0,     'k-3_E': 0,     'k-3_F': 0,
+        'k-4_D': 0,     'k-4_E': 0,     'k-4_F': 0,
+        'ion': 0.025,
+    }, name='Roelant')
+
+    fig, axs = VSM.plot_grouped_by(
+        model.optimal_x.rename('model'),
+        rate_constants_roelant,
+        group_as=['k-'], file_name='plot_x', xtick_rotation=90)
+    axs[0].set_ylabel('backwards')
+    axs[0].set_yscale('log')
+    axs[1].set_ylabel('forwards')
+    axs[1].set_yscale('log')
+    VSM.save_image(fig, 'plot_x')
+
+.. image:: images/extensive_example/plot_x.png
+    :width: 600
+    :align: center
+
+The total error of the model is 0.196 (model_weighed_errors.sum()), which is approximately 83% of the error found by
+Roelant. However, they did not put the same weights on the these parameters, so it is logical that their fit will be
+different.
+
+.. code-block:: python
+
+    model_pred = RCO.create_prediction(model.optimal_x.values, model.optimal_x.index.tolist())
+    model_weighed_errors = RCO.weigh_errors(errors=RCO.calculate_errors(model_pred)).rename('model')
+
+    Roelant_pred = RCO.create_prediction(rate_constants_roelant.values, rate_constants_roelant.index.tolist())
+    Roelant_weighed_errors = RCO.weigh_errors(errors=RCO.calculate_errors(Roelant_pred)).rename('Roelant')
+
+    fig, axs = VSM.plot_grouped_by(
+        model_weighed_errors,
+        Roelant_weighed_errors,
+        group_as=['ratio_label', 'ratio_isomer', 'TIC-normal', 'TIC-labeled'], file_name='plot_errors', xtick_rotation=20,
+        figsize=(6, 8), sharey='col')
+    VSM.save_image(fig, 'plot_errors')
+
+.. image:: images/extensive_example/plot_errors.png
+    :width: 600
+    :align: center
+
+.. code-block:: python
+
+    VSM.plot_enantiomer_ratio(
+        group_as=['3', '4/5', '6'],
+        ratio_of=['D', 'E'],
+        experimental=experimental,
+        prediction=model_pred)
+
+.. image:: images/extensive_example/plot_enantiomer_ratio.png
+    :width: 600
+    :align: center
+
+.. code-block:: python
+
+    VSM.plot_rate_over_time(log_scale=True, x_min=1e-4)
+
+.. image:: images/extensive_example/plot_rate_over_time.png
+    :width: 600
+    :align: center
+
+.. code-block:: python
+
+    VSM.plot_rate_sensitivity(x_min=1e-6, x_max=100, steps=101, max_error=0.5)
+
+.. image:: images/extensive_example/plot_rate_sensitivity.png
+    :width: 600
+    :align: center
+
+We can visualize the curves that are used for the calculation of the error as follows:
 
 .. code-block:: python
 
     fig_label, axs_label = plt.subplots(3, 1, tight_layout=True, figsize=(8, 8), squeeze=False)
-    fig_label.suptitle('label ratio')
+    axs_label[0, 0].set_title('label ratio')
     fig_isomer, axs_isomer = plt.subplots(2, 1, tight_layout=True, squeeze=False)
-    fig_isomer.suptitle('isomer ratio')
+    axs_isomer[0, 0].set_title('isomer ratio')
     fig_TIC, axs_TIC = plt.subplots(3, 2, tight_layout=True, figsize=(8, 8), squeeze=False)
-    fig_TIC.suptitle('TIC shape')
+    axs_TIC[0, 0].set_title('TIC shape')
     marker_settings = {"alpha": 0.4, "marker": ".", "s": 1}
-
-    model = RCO.load_optimized_model(path)
 
     best_prediction: pd.DataFrame = RCO.create_prediction(model.optimal_x, model.x_description)
 
@@ -425,42 +532,46 @@ We can visualize the curves that are used for the caluclation of the error as fo
         for j, isomer in enumerate(ISOMERS):
             # the "iso_" prefix is given to each chemical so that we can search the strings for e.g. "iso_A" and not get a match for label
             chemical_iso_split = f"int_{intermediate}_iso_{isomer}"
+            chemical = f"{intermediate}{isomer}"
 
             # plot label ratio
-            axs_label[j, 0].plot(time, pred[f"label_{chemical_iso_split}"], color=f"C{i}", label=f"{chemical_iso_split} MAE: {errors[f'label_{chemical_iso_split}']:.3f}")
-            axs_label[j, 0].scatter(time, true[f"label_{chemical_iso_split}"], color=f"C{i}", **marker_settings)
+            axs_label[j, 0].plot(time, pred[f"ratio_label_{chemical_iso_split}"], color=f"C{i}",
+                label=f"{chemical_iso_split} MAE: {errors[f'ratio_label_{chemical_iso_split}']:.3f}")
+            axs_label[j, 0].scatter(time, true[f"ratio_label_{chemical_iso_split}"], color=f"C{i}", **marker_settings)
             # the curve of the labeled compound is the same, by definition, as 1 - unlabeled
-            axs_label[j, 0].plot(time, 1-pred[f"label_{chemical_iso_split}"], color="tab:gray")
-            axs_label[j, 0].scatter(time, 1-true[f"label_{chemical_iso_split}"], color="tab:gray", **marker_settings)
+            axs_label[j, 0].plot(time, 1-pred[f"ratio_label_{chemical_iso_split}"], color="tab:gray")
+            axs_label[j, 0].scatter(time, 1-true[f"ratio_label_{chemical_iso_split}"], color="tab:gray", **marker_settings)
 
             # isomer ratio
-            axs_isomer[i, 0].plot(time, pred[f"isomer_{chemical_iso_split}"], label=f"{chemical_iso_split} MAE: {errors[f'isomer_{chemical_iso_split}']:.3f}")
-            axs_isomer[i, 0].scatter(time, RCO.experimental_curves[f"isomer_{chemical_iso_split}"], **marker_settings)
+            axs_isomer[i, 0].plot(time, pred[f"ratio_isomer_{chemical_iso_split}"],
+                label=f"{chemical} MAE: {errors[f'ratio_isomer_{chemical_iso_split}']:.3f}")
+            axs_isomer[i, 0].scatter(time, RCO.experimental_curves[f"ratio_isomer_{chemical_iso_split}"], **marker_settings)
 
             # TIC shape
-            axs_TIC[j, i].plot(time, pred[f"TIC_{chemical_iso_split}"],
-                               color="tab:blue", label=f"{chemical_iso_split} MAE: {errors[f'TIC_{chemical_iso_split}']:.3f}")
-            axs_TIC[j, i].scatter(time, RCO.experimental_curves[f"TIC_{chemical_iso_split}"], color="tab:blue", **marker_settings)
+            axs_TIC[j, i].plot(time, pred[f"TIC-normal_{chemical_iso_split}"], color="tab:blue",
+                               label=f"{chemical} MAE: {errors[f'TIC-normal_{chemical_iso_split}']:.3f}")
+            axs_TIC[j, i].scatter(time, RCO.experimental_curves[f"TIC-normal_{chemical_iso_split}"], color="tab:blue", **marker_settings)
 
-            axs_TIC[j, i].plot(time, pred[f"TIC_{chemical_iso_split}'"],
-                               color="tab:gray", label=f"""{chemical_iso_split} MAE: {errors[f"TIC_{chemical_iso_split}'"]:.3f}""")
-            axs_TIC[j, i].scatter(time, RCO.experimental_curves[f"TIC_{chemical_iso_split}'"], color="tab:gray", **marker_settings)
+            axs_TIC[j, i].plot(time, pred[f"TIC-labeled_{chemical_iso_split}"], color="tab:gray",
+                label=f"""{chemical}{LABEL} MAE: {errors[f"TIC-labeled_{chemical_iso_split}"]:.3f}""")
+            axs_TIC[j, i].scatter(time, RCO.experimental_curves[f"TIC-labeled_{chemical_iso_split}"], color="tab:gray", **marker_settings)
 
     for ax in np.concatenate([axs_label.flatten(), axs_isomer.flatten(), axs_TIC.flatten()]):
         ax.legend()
 
-    fig_label.show()
-    fig_isomer.show()
-    fig_TIC.show()
+    VSM.save_image(fig_label, 'label')
+    VSM.save_image(fig_isomer, 'isomer')
+    VSM.save_image(fig_TIC, 'TIC')
 
-.. image:: images/extensive_example_label.png
+.. image:: images/extensive_example/label.png
     :width: 600
     :align: center
 
-.. image:: images/extensive_example_isomer.png
+.. image:: images/extensive_example/isomer.png
     :width: 600
     :align: center
 
-.. image:: images/extensive_example_TIC.png
+.. image:: images/extensive_example/TIC.png
     :width: 600
     :align: center
+

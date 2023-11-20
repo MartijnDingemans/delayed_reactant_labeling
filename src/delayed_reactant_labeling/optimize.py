@@ -62,7 +62,7 @@ class OptimizedModel:
         The description of each parameter.
     n_dimensions : int
         The number of parameters.
-    n_iterations : int
+    n_function_evaluations : int
         The number of computed iterations.
     all_x : pd.DataFrame
         The applied parameters for each iteration.
@@ -106,7 +106,7 @@ class OptimizedModel:
             warnings.warn(f'failed to read {n_failed} lines in {log_path}')
 
         self.n_dimensions = len(self.x_description)
-        self.n_iterations = len(df)
+        self.n_function_evaluations = len(df)
 
         self.all_x: pd.DataFrame = pd.DataFrame(list(df.loc[:, "x"]), columns=self.x_description)
         self.all_errors: pd.Series = df["error"]

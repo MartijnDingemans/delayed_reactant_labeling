@@ -82,7 +82,7 @@ class VisualizeSingleModel:
             if path.exists():
                 raise FileExistsError(f'An image already exists! \nPath: {path}\n')
 
-    def save_image(self, fig, file_name):
+    def save_image(self, fig, file_name, tight_layout=True):
         """Saves an image with all relevant extensions, and the correct dpi.
         It will be stored in the folder, specified by the ``path``.
 
@@ -90,21 +90,25 @@ class VisualizeSingleModel:
         ----
         fig
             The figure that is to be saved.
-
         file_name
             The file name for the figure.
+        tight_layout
+            If fig.tight_layout() should be called.
+            Does not work with ``plot_path_in_pca``.
         """
         # title = fig.axes[0].get_title()
         # fig.axes[0].set_title(self.plot_title if not title else f'{self.plot_title}\n{title}')
         fig.suptitle(self.plot_title)
-        fig.tight_layout()
+        if tight_layout:
+            fig.tight_layout()
         for extension in self.extensions:
             fig.savefig(self.path / f"{file_name}.{extension.split('.')[-1]}", dpi=self.dpi)  # remove leading .
 
     def plot_optimization_progress(self,
                                    file_name: Optional[str] = None,
                                    ratio: Optional[tuple[str, list[str]]] = None,
-                                   n_points: int = 100
+                                   n_points: int = 100,
+                                   **fig_kwargs,
                                    ) -> tuple[plt.Figure, plt.Axes]:
         """Shows the error as function of the iteration number.
 
@@ -121,11 +125,13 @@ class VisualizeSingleModel:
         n_points
             The number of iterations for which the ratio will be re-calculated.
             These are uniformly distributed over all possible iterations.
+        **fig_kwargs
+            Additional keyword arguments that are passed on to plt.subplots().
         """
         if file_name is None:
             file_name = 'plot_optimization_progress'
         self._image_exists(file_name)
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(**fig_kwargs)
         ax.scatter(range(len(self.model.all_errors)), self.model.all_errors, alpha=0.3)
 
         if ratio is not None:
@@ -151,8 +157,9 @@ class VisualizeSingleModel:
                         file_name: Optional[str] = None,
                         group_as: Optional[list[str]] = None,
                         show_remaining: bool = True,
-                        xtick_rotation: float = 0
-                        ) -> tuple[plt.Figure, plt.Axes]:
+                        xtick_rotation: float = 0,
+                        **fig_kwargs
+                        ) -> tuple[plt.Figure, np.ndarray[plt.Axes]]:
         """Plots the data in args, and allows easy grouping with respect to their index.
 
         Args
@@ -171,6 +178,8 @@ class VisualizeSingleModel:
             Show the parameter which were not matched by any key in group_as.
         xtick_rotation
             The rotation of the x ticks in degrees.
+        **fig_kwargs
+            Additional keyword arguments that are passed on to plt.subplots().
         """
         if not args:
             raise ValueError('No data was given to be plotted.')
@@ -203,7 +212,7 @@ class VisualizeSingleModel:
         if show_remaining and any(total_hits == 0):
             key_hits = pd.concat([key_hits, (total_hits == 0).to_frame('other').T])
 
-        fig, axs = plt.subplots(len(key_hits), 1, squeeze=False)
+        fig, axs = plt.subplots(len(key_hits), 1, squeeze=False, **fig_kwargs)
         axs = axs.flatten()
         flx, frx = np.inf, -np.inf  # furthest left, furthest right.
         for ax, (group_key, selected_x) in zip(axs, key_hits.iterrows()):
@@ -219,9 +228,8 @@ class VisualizeSingleModel:
             if n != 0:
                 ax.get_legend().remove()
             ax.set_xlim(flx, frx)
-            ax.set_xticks(ax.get_xticks(), ax.get_xticklabels(), rotation=xtick_rotation, fontsize="small")
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=xtick_rotation, fontsize='small')
 
-        fig.supylabel('intensity')
         self.save_image(fig, file_name)
         return fig, axs
 
@@ -229,6 +237,7 @@ class VisualizeSingleModel:
                          file_name: Optional[str] = None,
                          PC1: int = 0,
                          PC2: int = 1,
+                         **fig_kwargs
                          ) -> tuple[plt.Figure, np.ndarray[plt.Axes]]:
         """Plots the path in the dimensionally reduced space (by means of principal component analysis).
 
@@ -241,6 +250,8 @@ class VisualizeSingleModel:
             The first principal component that should be plotted.
         PC2
             The second principal component that should be plotted.
+        **fig_kwargs
+            Additional keyword arguments that are passed on to plt.Figure().
 
         Returns
         -------
@@ -252,7 +263,7 @@ class VisualizeSingleModel:
             file_name = 'plot_path_in_pca'
         self._image_exists(file_name)
 
-        fig = plt.figure()
+        fig = plt.figure(**fig_kwargs)
         gs = fig.add_gridspec(2, 2, width_ratios=(1, 4), height_ratios=(4, 1),
                               left=0.15, right=0.83, bottom=0.15, top=0.83,
                               wspace=0.05, hspace=0.05)
@@ -273,20 +284,22 @@ class VisualizeSingleModel:
         ax_pc1 = fig.add_subplot(gs[0, 0])
 
         x = np.arange(sum(~self.hide_params))
-        xticks = self.model.x_description[~self.hide_params]
+        ticks = self.model.x_description[~self.hide_params].to_list()
 
         ax_pc0.bar(x, pca.components_[PC1][~self.hide_params])
         ax_pc1.barh(x, pca.components_[PC2][~self.hide_params])
 
         ax_pc0.set_xlabel(f"component {PC1}, explained variance {pca.explained_variance_ratio_[PC1]:.2f}")
-        ax_pc0.set_xticks(x, xticks, rotation=90, fontsize="small")
+        ax_pc0.set_xticks(x)
+        ax_pc0.set_xticklabels(ticks, rotation=90, fontsize='small')
         ax_pc0.tick_params(left=False)
 
         ax_pc1.set_ylabel(f"component {PC2}, explained variance {pca.explained_variance_ratio_[PC2]:.2f}")
-        ax_pc1.set_yticks(x, xticks, fontsize="small")
+        ax_pc1.set_yticks(x)
+        ax_pc1.set_yticklabels(ticks, fontsize="small")
         ax_pc1.tick_params(bottom=False)
 
-        self.save_image(fig, file_name)
+        self.save_image(fig, file_name, tight_layout=False)
         return fig, np.array([ax, ax_pc0, ax_pc1])
 
     def plot_enantiomer_ratio(self,
@@ -296,6 +309,7 @@ class VisualizeSingleModel:
                               prediction: pd.DataFrame,
                               last_N: int = 100,
                               file_name: Optional[str] = None,
+                              **fig_kwargs
                               ) -> tuple[plt.Figure, plt.Axes]:
         """Groups the data (experimental or predicted), and calculates the fraction each chemical contributes to the
         total sum. E.g. group_as=['1', '2'] and ratio_of=['A', 'B', 'C'] would look for hits with respect to those keys,
@@ -318,12 +332,14 @@ class VisualizeSingleModel:
         file_name
             The file name for the image. This should not include any extension.
             If None (default), it is equal to 'plot_enantiomer_ratio'.
+        **fig_kwargs
+            Additional keyword arguments that are passed on to plt.subplots().
         """
         if file_name is None:
             file_name = 'plot_enantiomer_ratio'
         self._image_exists(file_name)
 
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(**fig_kwargs)
 
         def analyze_data(data: pd.DataFrame, marker, descr):
             for group_n, group in enumerate(group_as):
@@ -358,7 +374,8 @@ class VisualizeSingleModel:
         analyze_data(prediction, marker='|', descr='pred')
         ax.legend(ncol=2)
         ax.set_ylabel('fraction')
-        ax.set_xticks(np.arange(len(group_as)), group_as)
+        ax.set_xticks(np.arange(len(group_as)))
+        ax.set_xticklabels(group_as, fontsize="small")
         ax.set_xlabel('chemical')
 
         self.save_image(fig, file_name)
@@ -369,7 +386,9 @@ class VisualizeSingleModel:
             file_name: Optional[str] = None,
             x_min: Optional[float] = None,
             x_max: Optional[float] = None,
-            log_scale: bool = False) -> tuple[plt.Figure, plt.Axes]:
+            log_scale: bool = False,
+            **fig_kwargs
+            ) -> tuple[plt.Figure, plt.Axes]:
         """Plots the parameters, x, as a function of time.
 
         Args
@@ -383,6 +402,8 @@ class VisualizeSingleModel:
             Plot values lwoer than the max as the max.
         log_scale
             If true the data will be plotted on log_scale.
+        **fig_kwargs
+            Additional keyword arguments that are passed on to plt.subplots().
         """
         if file_name is None:
             file_name = 'plot_rate_over_time'
@@ -398,10 +419,12 @@ class VisualizeSingleModel:
             norm = LogNorm(vmin=x_min, vmax=x_max)
         else:
             norm = Normalize(vmin=x_min, vmax=x_max)
-        fig, ax = plt.subplots()
-        im = ax.imshow(self.model.all_x.T, aspect='auto', label='intensity', norm=norm)
-        fig.colorbar(im)
-        ax.set_yticks(np.arange(self.model.x_description.shape[0]), self.model.x_description.tolist())
+
+        fig, ax = plt.subplots(**fig_kwargs)
+        im = ax.imshow(self.model.all_x.loc[:, ~self.hide_params].T, aspect='auto', label='intensity', norm=norm)
+        fig.colorbar(im, label='intensity')
+        ax.set_yticks(np.arange(sum(~self.hide_params)))
+        ax.set_yticklabels(self.model.x_description[~self.hide_params].tolist())
         ax.set_xlabel('iteration')
         self.save_image(fig, file_name)
         return fig, ax
@@ -411,7 +434,9 @@ class VisualizeSingleModel:
                               x_max: float,
                               file_name: Optional[str] = None,
                               max_error: Optional[float] = None,
-                              steps: int = 101) -> (plt.Figure, plt.Axes):
+                              steps: int = 101,
+                              **fig_kwargs
+                              ) -> (plt.Figure, plt.Axes):
         """Plot the sensitivity of each parameter, x, to modifications. Only a single parameter is modified at once.
 
         Args
@@ -428,6 +453,8 @@ class VisualizeSingleModel:
             If None (default), 3 times the lowest value error will be used.
         steps
             The number of different values that will be modeled for each parameter.
+        **fig_kwargs
+            Additional keyword arguments that are passed on to plt.subplots().
         """
         if file_name is None:
             file_name = 'plot_rate_sensitivity'
@@ -447,34 +474,31 @@ class VisualizeSingleModel:
                 best_X = self.model.optimal_x.copy()
                 best_X[key] = adjusted_x
                 try:
-                    prediction = self.RCO.create_prediction(
-                        x=best_X.to_numpy(), x_description=self.model.x_description)
-                    unweighed_error = self.RCO.calculate_errors(prediction)
-                    found_error = self.RCO.calculate_total_error(unweighed_error)
+                    with warnings.catch_warnings():
+                        warnings.simplefilter('ignore')
+                        prediction = self.RCO.create_prediction(
+                            x=best_X.to_numpy(), x_description=self.model.x_description)
+                        unweighed_error = self.RCO.calculate_errors(prediction)
+                        found_error = self.RCO.calculate_total_error(unweighed_error)
                 except InvalidPredictionError:
                     found_error = np.nan
                 errors[row, col] = found_error
 
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(**fig_kwargs)
         if max_error is None:
             max_error = np.nanmin(errors) * 3
-        im = ax.imshow(errors, origin="lower", aspect="auto", norm=Normalize(vmax=max_error))
 
-        ax.set_xticks(np.arange(len(ticks)), ticks.index, fontsize="small")
+        ax.set_yscale('log')
+        im = ax.pcolormesh(np.arange(len(ticks)+1), np.geomspace(x_min, x_max, steps+1), errors,
+                           norm=Normalize(vmax=max_error), shading='auto', cmap='viridis_r')
+
+        ax.set_xticks(0.5+np.arange(len(ticks)))  # center the ticks
+        ax.set_xticklabels(ticks.index, fontsize="small")
         ax.tick_params(axis='x', rotation=45)
-
-        min_x_power = np.log10(x_min).round(0).astype(int)
-        max_x_power = np.log10(x_max).round(0).astype(int)
-
-        n_orders_of_magnitude = max_x_power - min_x_power + 1
-        ind = np.linspace(0, len(x_value) - 1, n_orders_of_magnitude).round(0).astype(int)
-        yticks = [f"{y:.0e}" for y in np.logspace(min_x_power, max_x_power, n_orders_of_magnitude)]
-        ax.set_yticks(ind, yticks)
-        ax.set_ylabel("adjusted value")
 
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", "5%", pad="3%")
-        fig.colorbar(im, cax=cax, label="MAE")
+        fig.colorbar(im, cax=cax, label="error")
         self.save_image(fig, file_name)
         return fig, ax
 
