@@ -1,8 +1,11 @@
 Visualize
 =========
+To visualize the data effectively several plotting functions have been created. The functions are split over the
+:class:`VisualizeSingleModel` and :class:`VisualizeMultipleSolutions`.
 
 .. note::
-    Still a WIP
+
+    Please see the :ref:`extensive example <extensiveVisuals>` for some examples on how to use this module.
 
 .. py:currentmodule:: visualize
 
@@ -11,10 +14,3 @@ Visualize
 
 .. autoclass:: VisualizeMultipleSolutions
     :members:
-
-.. _VisualizeExample:
-
-example
--------
-
-WIP

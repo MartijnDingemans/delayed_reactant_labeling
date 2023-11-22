@@ -10,7 +10,7 @@ can subsequently calculate the corresponding errors. This model can than:
 4. Save the intermediate results
 5. It will than repeat 1-4 until with different rate constants until the error no longer improves and the rate constants have converged to a stable value or the maximum number of iterations has been reached. The method, that is used to find the next guess, is the `Nelder-Mead <https://docs.scipy.org/doc/scipy/reference/optimize.minimize-neldermead.html>`_ algorithm with adaptive parameters.
 
-The :class:`RateConstantOptimizerTemplate` is an abstract base class which has implemented the numbered steps
+The :class:`optimize.RateConstantOptimizerTemplate` is an abstract base class which has implemented the numbered steps
 above. However, the user must define the error functions and the exact methodology of creating a prediction. The definition
 of the error functions consists out of two parts. First the data (either experimental or predicted) must be converted to
 a curve of interest, such as: :math:`A / (A + A_{labeled})`. Subsequently a ``metric`` wil be used to evaluate the

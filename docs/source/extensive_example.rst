@@ -1,16 +1,16 @@
 Extensive example
 =================
 
-Roelant et al. (`link <https://onlinelibrary.wiley.com/doi/full/10.1002/anie.202205720>`_, `DOI: doi/10.1002/anie.202205720`)
+Hilgers et al. (`link <https://onlinelibrary.wiley.com/doi/full/10.1002/anie.202205720>`_, `DOI: doi/10.1002/anie.202205720`)
 used DRL to analyze a reaction with the following mechanism:
 
-.. image:: images/extensive_example/roelant_mechanism.png
+.. image:: images/extensive_example/Hilgers_mechanism.png
     :width: 400
     :align: center
 
 There are 3 isomers per intermediate in this reaction:
 
-.. image:: images/extensive_example/roelant_isomers.jpeg
+.. image:: images/extensive_example/Hilgers_isomers.jpeg
     :width: 800
     :align: center
 
@@ -38,7 +38,7 @@ First we import the required modules, and show the original data around the time
     from delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate
     from delayed_reactant_labeling.predict import DRL
 
-    experimental_complete = pd.read_excel('experimental_data_Roelant.xlsx', engine='openpyxl')
+    experimental_complete = pd.read_excel('experimental_data_Hilgers.xlsx', engine='openpyxl')
     LABEL = "'"  # single ' will was used for labeled reactants. To keep the code general, we will use LABEL instead.
 
     fig, ax = plt.subplots()
@@ -157,7 +157,7 @@ is given by:
 
     [3]_t = [3]_{eq} \cdot (1 - e^{-(k_{-1} + k_2) \cdot t})
 
-Roelant et al. performed kinetic experiments that showed that :math:`k_{-1}` equals 0, and therefore we can straight
+Hilgers et al. performed kinetic experiments that showed that :math:`k_{-1}` equals 0, and therefore we can straight
 up extract :math:`k_2` from :eq:`3t`. In code this is done as follows:
 
 .. code-block:: python
@@ -397,9 +397,11 @@ Or multiple times:
         n_jobs=-2,  # uses all but 1 cpu cores available
     )
 
+.. _extensiveVisuals:
+
 Visualize
 ---------
-The :class:`visualize.VisualizeSingleModel` can be used to make various kinds of plots:
+The :class:`visualize.VisualizeSingleModel` can be used to make various kinds of plots.
 
 .. code-block:: python
 
@@ -414,23 +416,34 @@ The :class:`visualize.VisualizeSingleModel` can be used to make various kinds of
         hide_params=constraints['upper']==0,
         extensions=['.png', 'svg'])  # having a leading . does not matter
 
+The ratio of 6D to 6D + 6E can be plotted together with the error of the model as a function of the iteration number.
+
+.. code-block:: python
+
     VSM.plot_optimization_progress(ratio=['6D', ['6D', '6E']])
-    VSM.plot_path_in_pca(PC1=0, PC2=1)
 
 .. image:: images/extensive_example/plot_optimization_progress.png
     :width: 600
     :align: center
 
+We can plot its path through a dimensionally reduced space as follows:
+The figsize keyword is supplied to ensure that the figure is square.
+
+.. code-block:: python
+
+    VSM.plot_path_in_pca(PC1=0, PC2=1, figsize=(6.4, 6.4))
+
 .. image:: images/extensive_example/plot_path_in_pca.png
     :width: 600
     :align: center
 
-Most of the found rate constants are similar in size to those found by Roelant. However, the backwards
-reactions seem to have a large difference.
+The found rate constants can easily be plotted using the ``plot_grouped_by`` function. From this we can see
+that most of the found rate constants in our model are similar in size to those found by Hilgers.
+However, the backwards reactions seem to have a large difference.
 
 .. code-block:: python
 
-    rate_constants_roelant = pd.Series({
+    rate_constants_Hilgers = pd.Series({
         'k1_D': 1.5,    'k1_E': 0.25,   'k1_F': 0.01,
         'k2_D': 0.43,   'k2_E': 0.638,  'k2_F': 0.567,
         'k3_D': 0.23,   'k3_E': 0.35,   'k3_F': 0.3,
@@ -440,12 +453,12 @@ reactions seem to have a large difference.
         'k-3_D': 0,     'k-3_E': 0,     'k-3_F': 0,
         'k-4_D': 0,     'k-4_E': 0,     'k-4_F': 0,
         'ion': 0.025,
-    }, name='Roelant')
+    }, name='Hilgers')
 
     fig, axs = VSM.plot_grouped_by(
         model.optimal_x.rename('model'),
-        rate_constants_roelant,
-        group_as=['k-'], file_name='plot_x', xtick_rotation=90)
+        rate_constants_Hilgers,
+        group_by=['k-'], file_name='plot_x', xtick_rotation=90)
     axs[0].set_ylabel('backwards')
     axs[0].set_yscale('log')
     axs[1].set_ylabel('forwards')
@@ -456,8 +469,9 @@ reactions seem to have a large difference.
     :width: 600
     :align: center
 
+The errors of the model can be plotted using the ``plot_grouped_by`` function.
 The total error of the model is 0.196 (model_weighed_errors.sum()), which is approximately 83% of the error found by
-Roelant. However, they did not put the same weights on the these parameters, so it is logical that their fit will be
+Hilgers. However, they did not put the same weights on the these parameters, so it is logical that their fit will be
 different.
 
 .. code-block:: python
@@ -465,13 +479,13 @@ different.
     model_pred = RCO.create_prediction(model.optimal_x.values, model.optimal_x.index.tolist())
     model_weighed_errors = RCO.weigh_errors(errors=RCO.calculate_errors(model_pred)).rename('model')
 
-    Roelant_pred = RCO.create_prediction(rate_constants_roelant.values, rate_constants_roelant.index.tolist())
-    Roelant_weighed_errors = RCO.weigh_errors(errors=RCO.calculate_errors(Roelant_pred)).rename('Roelant')
+    Hilgers_pred = RCO.create_prediction(rate_constants_Hilgers.values, rate_constants_Hilgers.index.tolist())
+    Hilgers_weighed_errors = RCO.weigh_errors(errors=RCO.calculate_errors(Hilgers_pred)).rename('Hilgers')
 
     fig, axs = VSM.plot_grouped_by(
         model_weighed_errors,
-        Roelant_weighed_errors,
-        group_as=['ratio_label', 'ratio_isomer', 'TIC-normal', 'TIC-labeled'], file_name='plot_errors', xtick_rotation=20,
+        Hilgers_weighed_errors,
+        group_by=['ratio_label', 'ratio_isomer', 'TIC-normal', 'TIC-labeled'], file_name='plot_errors', xtick_rotation=20,
         figsize=(6, 8), sharey='col')
     VSM.save_image(fig, 'plot_errors')
 
@@ -479,17 +493,29 @@ different.
     :width: 600
     :align: center
 
+The percentage of chemicals which belong to pathway D or E can be plotted as follows:
+
 .. code-block:: python
 
     VSM.plot_enantiomer_ratio(
-        group_as=['3', '4/5', '6'],
+        group_by=['3', '4/5', '6'],
         ratio_of=['D', 'E'],
         experimental=experimental,
-        prediction=model_pred)
+        prediction=model_pred,
+        warn_label_assumption=False)
+
+Because both the labeled compound and the non-labeled compound have very similar names, (3D vs 3D'), we know
+that the identifiers given in ``group_by`` and ``ratio_of`` wont be able to seperate these two cases from each other.
+However, the shortest name will be used in the calculation as this is most likely the non-labeled compound.
+The corresponding warning which is emitted, we can therefore safely ignore by setting the flag ``warn_label_assumption``,
+to false. It is fine to plot only the ratios for the non-labeled compounds as the ratio between isomers should be
+identical for the non-labeled and labeled compounds.
 
 .. image:: images/extensive_example/plot_enantiomer_ratio.png
     :width: 600
     :align: center
+
+The changes in the parameters can be plotted over time by using a heatmap as follows:
 
 .. code-block:: python
 
@@ -498,6 +524,8 @@ different.
 .. image:: images/extensive_example/plot_rate_over_time.png
     :width: 600
     :align: center
+
+The sensitivity of the model, for each parameter with respect to a change in its value, can be shown as follows:
 
 .. code-block:: python
 
