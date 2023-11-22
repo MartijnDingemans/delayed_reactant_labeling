@@ -403,8 +403,8 @@ class RateConstantOptimizerTemplate(ABC):
         -------
         None
             All relevant metadata and progress on each iteration will be stored in path. It can be loaded and analyzed
-            either by using the :class:`visualize.VisualizeSingleSolution`, or :meth:`load_optimization_progress` which returns
-            an :class:`OptimizerProgress` instance.
+            either by using the :class:`visualize.VisualizeModel`, or :meth:`load_optimization_progress <optimize.RateConstantOptimizerTemplate.load_optimization_progress>` which returns
+            an :class:`optimize.OptimizedModel` instance.
         """
         log_mode = "new" if not _overwrite_log else "replace"
 
