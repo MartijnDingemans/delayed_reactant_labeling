@@ -1,35 +1,46 @@
 from __future__ import annotations
 
+import inspect
 import pathlib
 import warnings
 from collections.abc import Iterable
 from typing import Optional
 
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm, Normalize
 import numpy as np
 import pandas as pd
+from matplotlib.colors import LogNorm, Normalize
 from sklearn.decomposition import PCA
 from tqdm import tqdm
 
-
-from delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate, OptimizedModel
+from delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate, OptimizedModel, OptimizedMultipleModels
 from delayed_reactant_labeling.predict import InvalidPredictionError
 
 
-class VisualizeSingleModel:
+class VisualizeModel:
     """
-    Contains several methods which create plots of the :class:`OptimizedModel<optimize.OptimizedModel>`.
+    Contains several methods which help creating plots. The methods are split into three main groups:
+
+    #. Visualization of :class:`OptimizedModels<optimize.OptimizedModel>`
+    #. Visualization of :class:`OptimizedMultipleModels<optimize.OptimizedMultipleModel>`
+    #. Visualization of other data that is provided by the user.
+
     Each method will save the figure where the name is equal to the function name.
 
     Parameters
     ----------
-    path
+    image_path
         The path to the folder where the created images should be stored.
     model
-        The model of which plots should be created.
+        A single optimized model of which plots should be created.
+        If None, and models is not None, the best model in models will be used instead.
+        This will issue a warning once.
+    models
+        Multiple optimized models of which plots should be created. If model is None,
+        the best model in models will be used instead.
     rate_constant_optimizer
         The user implemented class of :class:`optimize.RateConstantOptimizerTemplate`.
+        Required by some functions.
     plot_title
         The title (plt.Figure.suptitle) that will be given to each plot.
         If None (default), no title will be given.
@@ -51,26 +62,58 @@ class VisualizeSingleModel:
     """
 
     def __init__(self,
-                 path: str | pathlib.Path,
-                 model: OptimizedModel,
-                 rate_constant_optimizer: RateConstantOptimizerTemplate,
+                 image_path: str | pathlib.Path,
+                 model: Optional[OptimizedModel] = None,
+                 models: Optional[OptimizedMultipleModels] = None,
+                 rate_constant_optimizer: Optional[RateConstantOptimizerTemplate] = None,
                  plot_title: Optional[str] = None,
                  hide_params: Optional[np.ndarray] = None,
                  dpi: int = 600,
                  extensions: Optional[Iterable[str] | str] = None,
                  overwrite_image: bool = False):
 
-        self.path = path if isinstance(path, pathlib.Path) else pathlib.Path(path)
+        self.path = image_path if isinstance(image_path, pathlib.Path) else pathlib.Path(image_path)
         self.path.mkdir(exist_ok=True, parents=True)  # upon image creation we check for duplicates
-        self.model = model
-        self.RCO = rate_constant_optimizer
+        self._model = model
+        self._models = models
+        self._RCO = rate_constant_optimizer
         self.plot_title = plot_title
         self.dpi = dpi
         extensions = [extensions] if isinstance(extensions, str) else extensions  # convert str to list
         self.extensions = ['png', 'svg'] if extensions is None else extensions
         self.overwrite_image = overwrite_image
-        self.best_prediction = self.RCO.create_prediction(x=model.optimal_x.values, x_description=model.x_description)
-        self.hide_params = np.zeros(len(model.x_description), dtype=bool) if hide_params is None else hide_params
+        self._hide_params = hide_params
+
+    @property
+    def model(self):
+        if self._model is not None:
+            return self._model
+        elif self._models is not None:
+            warnings.warn('No model was given, using the best model in models instead.')
+            self._model = self._models.best
+            return self._model
+        else:
+            raise ValueError(f'Function {inspect.stack()[1].function} requires a model, '
+                             f'but no model(s) were given when initializing the class.')
+
+    @property
+    def models(self):
+        if self._models is None:
+            raise ValueError(f'Function {inspect.stack()[1].function} requires multiple models, but None were given.')
+        return self._models
+
+    @property
+    def RCO(self):
+        if self._RCO is None:
+            raise ValueError(f'Function {inspect.stack()[1].function} requires a rate_constant_optimizer, '
+                             f'but None was given.')
+        return self._RCO
+
+    @property
+    def hide_params(self):
+        if self._hide_params is None:
+            self._hide_params = np.zeros(len(self.model.x_description), dtype=bool)
+        return self._hide_params
 
     def _image_exists(self, file_name):
         """Raises an FileExistsError if an image already exist"""
@@ -102,7 +145,8 @@ class VisualizeSingleModel:
         if tight_layout:
             fig.tight_layout()
         for extension in self.extensions:
-            fig.savefig(self.path / f"{file_name}.{extension.split('.')[-1]}", dpi=self.dpi)  # remove leading .
+            fig.savefig(self.path / f"{file_name}.{extension.split('.')[-1]}",  # remove leading .
+                        dpi=self.dpi, bbox_inches='tight')
 
     def plot_optimization_progress(self,
                                    file_name: Optional[str] = None,
@@ -111,6 +155,8 @@ class VisualizeSingleModel:
                                    **fig_kwargs,
                                    ) -> tuple[plt.Figure, plt.Axes]:
         """Shows the error as function of the iteration number.
+
+        **requires a single model**
 
         Args
         ----
@@ -155,12 +201,14 @@ class VisualizeSingleModel:
     def plot_grouped_by(self,
                         *args: pd.Series,
                         file_name: Optional[str] = None,
-                        group_as: Optional[list[str]] = None,
+                        group_by: Optional[list[str]] = None,
                         show_remaining: bool = True,
                         xtick_rotation: float = 0,
                         **fig_kwargs
                         ) -> tuple[plt.Figure, np.ndarray[plt.Axes]]:
         """Plots the data in args, and allows easy grouping with respect to their index.
+
+        **requires no model**
 
         Args
         ----
@@ -171,7 +219,7 @@ class VisualizeSingleModel:
         file_name
             The file name for the image. This should not include any extension.
             If None (default), it is equal to 'plot_grouped_by'.
-        group_as
+        group_by
             Group the parameters by a key.
             Each parameter can only be matched with one key exactly.
         show_remaining
@@ -189,8 +237,8 @@ class VisualizeSingleModel:
             file_name = 'plot_grouped_by'
         self._image_exists(file_name)
 
-        if group_as is None:
-            group_as = ['']
+        if group_by is None:
+            group_by = ['']
 
         data = []
         index = []
@@ -201,9 +249,9 @@ class VisualizeSingleModel:
         data = pd.DataFrame(data, index=index, columns=x_description)  # aligns the data
 
         key_hits = []
-        for key in group_as:
+        for key in group_by:
             key_hits.append(x_description.str.contains(key))
-        key_hits = pd.DataFrame(key_hits, columns=x_description, index=group_as)
+        key_hits = pd.DataFrame(key_hits, columns=x_description, index=group_by)
         total_hits = key_hits.sum(axis=0)
 
         if any(total_hits > 1):
@@ -241,6 +289,8 @@ class VisualizeSingleModel:
                          ) -> tuple[plt.Figure, np.ndarray[plt.Axes]]:
         """Plots the path in the dimensionally reduced space (by means of principal component analysis).
 
+        **requires a single model**
+
         Args
         ----
         file_name
@@ -265,7 +315,7 @@ class VisualizeSingleModel:
 
         fig = plt.figure(**fig_kwargs)
         gs = fig.add_gridspec(2, 2, width_ratios=(1, 4), height_ratios=(4, 1),
-                              left=0.15, right=0.83, bottom=0.15, top=0.83,
+                              left=0.15, right=0.80, bottom=0.15, top=0.8,
                               wspace=0.05, hspace=0.05)
 
         ax = fig.add_subplot(gs[0, 1])
@@ -276,7 +326,7 @@ class VisualizeSingleModel:
         ax.tick_params(bottom=False, left=False, labelbottom=False, labelleft=False)
         ax_bbox = ax.get_position(original=True)
         # noinspection PyTypeChecker
-        cax = plt.axes([0.85, ax_bbox.ymin, 0.05, ax_bbox.size[1]])
+        cax = plt.axes([0.82, ax_bbox.ymin, 0.05, ax_bbox.size[1]])
         cbar = plt.colorbar(scattered, cax=cax)
         cbar.set_label("iteration")
 
@@ -303,21 +353,24 @@ class VisualizeSingleModel:
         return fig, np.array([ax, ax_pc0, ax_pc1])
 
     def plot_enantiomer_ratio(self,
-                              group_as: list[str],
+                              group_by: list[str],
                               ratio_of: list[str],
                               experimental: pd.DataFrame,
                               prediction: pd.DataFrame,
                               last_N: int = 100,
                               file_name: Optional[str] = None,
+                              warn_label_assumption: bool = True,
                               **fig_kwargs
                               ) -> tuple[plt.Figure, plt.Axes]:
         """Groups the data (experimental or predicted), and calculates the fraction each chemical contributes to the
         total sum. E.g. group_as=['1', '2'] and ratio_of=['A', 'B', 'C'] would look for hits with respect to those keys,
         and one of the calculated data points would be: 1_A / (1_A + 1_B + 1_C)
 
+        **requires a single model**
+
         Args
         ----
-        group_as
+        group_by
             Groups the data by a key.
             Each index can only be matched with one key exactly.
         ratio_of
@@ -332,6 +385,11 @@ class VisualizeSingleModel:
         file_name
             The file name for the image. This should not include any extension.
             If None (default), it is equal to 'plot_enantiomer_ratio'.
+        warn_label_assumption
+            If true (default), a warning will be issued when exactly two matches are found for each combination of the 
+            elements in group_as and ratio_of. This can be caused by e.g. both '3' and 'D' being present in the strings
+            "3_bla_D" and "3_bla_D-custom_label". To resolve this tie the shorted string will be used as it is most
+            likely to be the non-labeled compound.  
         **fig_kwargs
             Additional keyword arguments that are passed on to plt.subplots().
         """
@@ -342,29 +400,35 @@ class VisualizeSingleModel:
         fig, ax = plt.subplots(**fig_kwargs)
 
         def analyze_data(data: pd.DataFrame, marker, descr):
-            for group_n, group in enumerate(group_as):
+            for group_n, group in enumerate(group_by):
                 grouped_data = data.loc[:, data.columns.str.contains(group)]
-                mask_list = [grouped_data.columns.str.contains(element) for element in ratio_of]
-                mask_ratio_of = np.array(mask_list).any(axis=0)
 
-                grouped_data_sum = grouped_data.loc[-last_N:, mask_ratio_of].sum(axis=1)
-                for element_n, element in enumerate(ratio_of):
-                    element_index = np.nonzero(grouped_data.columns.str.contains(element))[0]
-                    if len(element_index) == 0:
-                        warnings.warn(f'No matching elements were found for {group} with element {element}, skipping entry.')
+                ratio_of_index = []  # index of hits for each element in ratio_of, corrected for multiple matches
+                for ratio_of_element in ratio_of:
+                    el_ind = np.nonzero(grouped_data.columns.str.contains(ratio_of_element))[0]
+                    if len(el_ind) == 0:
+                        warnings.warn(f'No matching columns were found for {group} with item {ratio_of_element} '
+                                      f'in the {descr} data, skipping entry.')
                         continue
-                    elif len(element_index) == 2:
-                        warnings.warn(f'Exactly two matching elements were found for {group} with element {element}.'
-                                      f'Taking the shortest hit in the assumption that the other one is the labeled '
-                                      f'version. Hits: {grouped_data.columns[element_index]}')
-                        if len(grouped_data.columns[element_index[0]]) < len(grouped_data.columns[element_index[1]]):
-                            element_index = element_index[0]
-                        else:
-                            element_index = element_index[1]
+                    elif len(el_ind) == 1:
+                        el_ind = el_ind[0]  # from list to int
+                    elif len(el_ind) == 2:
+                        el0, el1 = grouped_data.columns[el_ind]
+                        if warn_label_assumption:
+                            warnings.warn(
+                                f'Exactly two matching columns were found for {group} with item {ratio_of_element}.'
+                                f'Taking the shortest hit in the assumption that the other one is the labeled '
+                                f'version. Hits: {el0, el1}')
+                        el_ind = el_ind[0] if el0 < el1 else el_ind[1]
+                    else:
+                        raise ValueError(f'Too many matching columns were found {group} with items {ratio_of_element}.')
+                    ratio_of_index.append(el_ind)
 
-                    label = f'{descr}: {element}' if group_n == 0 else None
+                grouped_data_sum = grouped_data.iloc[-last_N:, ratio_of_index].sum(axis=1)
+                for element_n, el_ind in enumerate(ratio_of_index):
+                    label = f'{descr}: {ratio_of[element_n]}' if group_n == 0 else None
                     ax.scatter(group_n,
-                               grouped_data.iloc[:, element_index].divide(grouped_data_sum, axis=0).mean(),
+                               grouped_data.iloc[-last_N:, el_ind].divide(grouped_data_sum, axis=0).mean(axis=0),
                                marker=marker,
                                label=label,
                                color=f'C{element_n}',
@@ -374,8 +438,8 @@ class VisualizeSingleModel:
         analyze_data(prediction, marker='|', descr='pred')
         ax.legend(ncol=2)
         ax.set_ylabel('fraction')
-        ax.set_xticks(np.arange(len(group_as)))
-        ax.set_xticklabels(group_as, fontsize="small")
+        ax.set_xticks(np.arange(len(group_by)))
+        ax.set_xticklabels(group_by, fontsize="small")
         ax.set_xlabel('chemical')
 
         self.save_image(fig, file_name)
@@ -388,14 +452,16 @@ class VisualizeSingleModel:
             x_max: Optional[float] = None,
             log_scale: bool = False,
             **fig_kwargs
-            ) -> tuple[plt.Figure, plt.Axes]:
+    ) -> tuple[plt.Figure, plt.Axes]:
         """Plots the parameters, x, as a function of time.
+
+        **requires a single model**
 
         Args
         ----
         file_name
             The file name for the image. This should not include any extension.
-            If None (default), it is equal to 'plot_path_in_pca'.
+            If None (default), it is equal to 'plot_rate_over_time'.
         x_min
             Plot values lower than the min as the min.
         x_max
@@ -436,8 +502,10 @@ class VisualizeSingleModel:
                               max_error: Optional[float] = None,
                               steps: int = 101,
                               **fig_kwargs
-                              ) -> (plt.Figure, plt.Axes):
+                              ) -> tuple[plt.Figure, plt.Axes]:
         """Plot the sensitivity of each parameter, x, to modifications. Only a single parameter is modified at once.
+
+        **requires a single model**
 
         Args
         ----
@@ -447,7 +515,7 @@ class VisualizeSingleModel:
             The maximum value for x
         file_name
             The file name for the image. This should not include any extension.
-            If None (default), it is equal to 'plot_path_in_pca'.
+            If None (default), it is equal to 'plot_rate_sensitivity'.
         max_error
             All values larger the maximum value will be plotted as the maximum error.
             If None (default), 3 times the lowest value error will be used.
@@ -489,89 +557,116 @@ class VisualizeSingleModel:
             max_error = np.nanmin(errors) * 3
 
         ax.set_yscale('log')
-        im = ax.pcolormesh(np.arange(len(ticks)+1), np.geomspace(x_min, x_max, steps+1), errors,
+        im = ax.pcolormesh(np.arange(len(ticks) + 1), np.geomspace(x_min, x_max, steps + 1), errors,
                            norm=Normalize(vmax=max_error), shading='auto', cmap='viridis_r')
 
-        ax.set_xticks(0.5+np.arange(len(ticks)))  # center the ticks
+        ax.set_xticks(0.5 + np.arange(len(ticks)))  # center the ticks
         ax.set_xticklabels(ticks.index, fontsize="small")
         ax.tick_params(axis='x', rotation=45)
 
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", "5%", pad="3%")
+        ax.set_ylabel('parameter intensity')
         fig.colorbar(im, cax=cax, label="error")
         self.save_image(fig, file_name)
         return fig, ax
 
+    def plot_error_all_runs(self, top_n: Optional[int] = None, file_name: Optional[str] = None, **fig_kwargs) -> tuple[
+        plt.Figure, plt.Axes]:
+        """Plots the error of each model.
 
-class VisualizeMultipleSolutions:
-    def __init__(self, path: pathlib.Path, max_guess: int = np.inf):
-        """Loads the data in the path."""
-        self.complete_all_X = []
-        self.complete_initial_X = []
-        self.complete_optimal_X = []
-        self.complete_found_error = []
-        self.x_description = None
+        **requires multiple model**
 
-        for n, guess_path in tqdm(enumerate(path.iterdir())):
-            if not guess_path.is_dir():
-                max_guess += 1
-                continue
-            if n > max_guess:
-                break
+        Args
+        ----
+        top_n
+            How many of the best runs should be plotted.
+            If None (default), all runs will be plotted.
+        file_name
+            The file name for the image. This should not include any extension.
+            If None (default), it is equal to 'plot_error_all_runs'.
+        **fig_kwargs
+            Additional keyword arguments that are passed on to plt.subplots().
+        """
+        if file_name is None:
+            file_name = 'plot_error_all_runs'
+        self._image_exists(file_name)
 
-            progress = OptimizedModel(guess_path)
-
-            self.complete_all_X.append(progress.all_x)
-            self.complete_initial_X.append(progress.all_x.iloc[0, :])
-            self.complete_optimal_X.append(progress.optimal_x)
-            self.complete_found_error.append(progress.optimal_error)
-
-            if self.x_description is None:
-                self.x_description = progress.x_description
-
-        # complete all X is not here as it is already a 2D matrix
-        self.complete_initial_X = np.array(self.complete_initial_X)
-        self.complete_optimal_X = np.array(self.complete_optimal_X)
-        self.complete_found_error = np.array(self.complete_found_error)
-
-    def show_error_all_runs(self, top_n=-1) -> tuple[plt.Figure, plt.Axes]:
-        if top_n == -1:
-            top_n = len(self.complete_found_error)
-        ind = np.argsort(self.complete_found_error)[:top_n]
-
-        fig, ax = plt.subplots(layout='tight')
-        ax.scatter(np.arange(top_n), self.complete_found_error[ind])
+        fig, ax = plt.subplots(**fig_kwargs)
+        if top_n is None:
+            top_n = len(self.models.all_optimal_error.shape[0])
+        ind = np.argsort(self.models.all_optimal_error)[:top_n]
+        ax.scatter(np.arange(ind.shape[0]), self.models.all_optimal_error[ind])
         ax.set_xlabel('run number (sorted by error)')
         ax.set_ylabel('error')
+        self.save_image(fig, file_name)
         return fig, ax
 
-    def show_summary_all_runs(self,
-                              rco: RateConstantOptimizerTemplate,
-                              compound_ratio: list[str, list[str]],
-                              top_n: int = -1,
-                              max_error: float = 0.5) -> tuple[plt.Figure, plt.Axes]:
-        fig, ax = plt.subplots(layout='tight')
-        ind = np.argsort(self.complete_found_error)[:top_n]
+    def plot_ratio_all_runs(self,
+                            ratio: list[str, list[str]],
+                            top_n: Optional[int] = 20,
+                            file_name: Optional[str] = None,
+                            **fig_kwargs) -> tuple[plt.Figure, plt.Axes]:
+        """Plots the expected ratio with respect to each model, which are sorted on their performance.
+
+        **requires multiple model**
+
+        Args
+        ----
+        ratio
+             The first element indicates the chemical of interest,
+             and the second element the chemicals it is compared to.
+             For example (‘A’, [‘A’, ‘B’]), calculates $$A/(A+B)$$.
+             It will plot the ratio for the last time point in each model.
+        top_n
+            How many of the best runs should be plotted.
+            If None (default), all runs will be plotted.
+        file_name
+            The file name for the image. This should not include any extension.
+            If None (default), it is equal to 'plot_ratio_all_runs'.
+        **fig_kwargs
+            Additional keyword arguments that are passed on to plt.subplots().
+        """
+        if file_name is None:
+            file_name = 'plot_ratio_all_runs'
+        self._image_exists(file_name)
+
+        fig, ax = plt.subplots(**fig_kwargs)
+
+        ind = np.argsort(self.models.all_optimal_error)[:top_n]
 
         found_ratio = []
         for run_index in ind:
-            pred = rco.create_prediction(self.complete_optimal_X[run_index].values,
-                                         self.complete_optimal_X[run_index].index)
-            found_ratio.append(pred[compound_ratio[0]] / pred[compound_ratio[1]].sum(axis=1))  # TODO double check this
+            pred = self.RCO.create_prediction(self.models.all_optimal_x[run_index].values,
+                                              self.models.all_optimal_x[run_index].index)
+            found_ratio.append(pred[ratio[0]] / pred[ratio[1]].sum(axis=1))
 
-        error = np.array(self.complete_found_error)
-        error[error > max_error] = max_error
         im = ax.scatter(np.arange(len(ind)),
                         found_ratio[ind],
-                        c=np.array(self.complete_found_error)[ind])
-
+                        c=self.models.all_optimal_error[ind],)
         fig.colorbar(im, ax=ax, label='error')
         ax.set_xlabel('run number (sorted by error)')
         ax.set_ylabel('ratio')
         return fig, ax
 
-    def show_rate_constants(self, max_error: float, index_constant_values: np.ndarray = None) -> tuple[
-        plt.Figure, plt.Axes]:
+    def show_rate_constants(self, max_error: float, index_constant_values: np.ndarray = None
+                            ) -> tuple[plt.Figure, plt.Axes]:
+        """TODO description
+
+        **requires multiple model**
+
+        Args
+        ----
+        file_name
+            The file name for the image. This should not include any extension.
+            If None (default), it is equal to TODO 'plot_rate_sensitivity'.
+        **fig_kwargs
+            Additional keyword arguments that are passed on to plt.subplots().
+        """
+        if file_name is None:
+            file_name = 'plot_rate_sensitivity'
+        self._image_exists(file_name)
+
         ind_allowed_error = np.array(self.complete_found_error) < max_error
         df = pd.DataFrame(np.array(self.complete_optimal_X)[ind_allowed_error], columns=self.x_description)
         if index_constant_values is not None:
@@ -590,6 +685,22 @@ class VisualizeMultipleSolutions:
                     pc1: int = 0,
                     pc2: int = 1,
                     ax: plt.Axes = None):
+        """TODO description
+
+        **requires multiple model**
+
+        Args
+        ----
+        file_name
+            The file name for the image. This should not include any extension.
+            If None (default), it is equal to TODO 'plot_rate_sensitivity'.
+        **fig_kwargs
+            Additional keyword arguments that are passed on to plt.subplots().
+        """
+        if file_name is None:
+            file_name = 'plot_rate_sensitivity'
+        self._image_exists(file_name)
+
         from sklearn.decomposition import PCA
         from sklearn.preprocessing import StandardScaler
 
