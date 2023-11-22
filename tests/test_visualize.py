@@ -5,8 +5,8 @@ import pandas as pd
 import pytest
 from pytest import raises
 
-from delayed_reactant_labeling.optimize import OptimizedModel
-from delayed_reactant_labeling.visualize import VisualizeSingleModel
+from delayed_reactant_labeling.optimize import OptimizedModel, OptimizedMultipleModels
+from delayed_reactant_labeling.visualize import VisualizeModel
 from test_optimize import RCO, fake_data
 
 # remove all prior images to make sure that we recreate them!
@@ -14,19 +14,28 @@ image_folder = pathlib.Path('./complete_optimization/images')
 shutil.rmtree(image_folder, ignore_errors=True)
 image_folder.mkdir()
 
+# RCO.optimize_multiple(
+#     path='./complete_multiple_optimization/',
+#     x_description=x_description,
+#     x_bounds=bounds,
+#     n_runs=10,
+#     n_jobs=-2)
+
 # RCO.optimize(
 #     x0=np.array([1, 1, 1]),
 #     x_description=x_description,
 #     x_bounds=bounds,
 #     path='./complete_optimization/')
-model = OptimizedModel('./complete_optimization')
+models = OptimizedMultipleModels('./complete_multiple_optimization')
+model = models.best  # OptimizedModel('./complete_optimization')
 
 
 @pytest.fixture
-def VSM_fixture():
-    return VisualizeSingleModel(
-        path=image_folder,
+def VM_fixture():
+    return VisualizeModel(
+        image_path=image_folder,
         model=model,
+        models=models,
         rate_constant_optimizer=RCO,
         plot_title='overwritten!',
         hide_params=None,
@@ -35,15 +44,17 @@ def VSM_fixture():
         overwrite_image=True)
 
 
-# def test_new_method(VSM_fixture):
-#     VSM_fixture.plot_rate_over_time()
+def test_new_method(VM_fixture):
+    pass
+    # VM_fixture.plot_biplot_all_runs(slice(None))
+    # VM_fixture.plot_x_all_runs(slice(5))
 
 
 def test_extensions():
     path_extensions = pathlib.Path('./complete_optimization/extensions/')
     for extensions in ['.png', 'png', ('png', '.svg'), {'.png', 'svg'}]:
-        VSM = VisualizeSingleModel(
-            path=path_extensions,
+        VSM = VisualizeModel(
+            image_path=path_extensions,
             model=model,
             rate_constant_optimizer=RCO,
             plot_title='test_title',
@@ -58,7 +69,7 @@ def test_extensions():
 
 
 class VSMHelper:
-    def __init__(self, VSM: VisualizeSingleModel):
+    def __init__(self, VSM: VisualizeModel):
         self.VSM = VSM
 
     def plot_optimization_progress(self):
@@ -70,19 +81,17 @@ class VSMHelper:
             self.VSM.model.optimal_x.rename('model'),
             pd.Series([0.8, 0.4, 0.67], index=['k-1', 'k1', 'k2'], name='fake1'),
             pd.Series([0.6, 0.3, 0.87], index=['k2', 'k1', 'k-1'], name='fake2'),
-            group_as=['k-'], file_name='plot_x', xtick_rotation=90)
+            group_by=['k-'], file_name='plot_x', xtick_rotation=90)
 
     def plot_grouped_by_error(self):
-        pred = self.VSM.RCO.create_prediction(x=self.VSM.model.optimal_x.values,
-                                              x_description=self.VSM.model.optimal_x.index.tolist())
+        pred = self.VSM.RCO.create_prediction(self.VSM.model.optimal_x.values,
+                                              self.VSM.model.optimal_x.index)
         errors = self.VSM.RCO.calculate_errors(pred)
         weighed_errors = self.VSM.RCO.weigh_errors(errors)
         fig, axs = self.VSM.plot_grouped_by(
             weighed_errors.rename('model'),
             pd.Series([0.01, 0.15, 0.01], index=['ratio_A', 'ratio_C', 'ratio_B'], name='fake1'),
-            group_as=['A'], file_name='plot_error')
-        axs[0].set_title(weighed_errors.sum().round(4))
-        fig.tight_layout()
+            group_by=['A'], file_name='plot_error')
         self.VSM.save_image(fig, 'plot_error')
 
     def plot_path_in_pca(self):
@@ -90,10 +99,10 @@ class VSMHelper:
 
     def plot_enantiomer_ratio(self):
         return self.VSM.plot_enantiomer_ratio(
-            group_as=['A', 'B', 'C'],
+            group_by=['A', 'B', 'C'],
             ratio_of=['-blank', '-d10'],
             experimental=fake_data,
-            prediction=RCO.create_prediction(model.optimal_x.values, model.optimal_x.index.tolist())
+            prediction=RCO.create_prediction(model.optimal_x.values, model.optimal_x.index)
         )
 
     def plot_rate_over_time(self):
@@ -101,6 +110,18 @@ class VSMHelper:
 
     def plot_rate_sensitivity(self):
         return self.VSM.plot_rate_sensitivity(x_min=1e-6, x_max=1e1, max_error=self.VSM.model.optimal_error*5, steps=11)
+
+    def plot_ratio_all_runs(self):
+        return self.VSM.plot_ratio_all_runs(ratio=('A-blank', ['A-blank', 'B-blank', 'C-blank']))
+
+    def plot_error_all_runs(self):
+        return self.VSM.plot_error_all_runs()
+
+    def plot_x_all_runs(self):
+        return self.VSM.plot_x_all_runs(slice(5))
+
+    def plot_biplot_all_runs(self):
+        return self.VSM.plot_biplot_all_runs(slice(6))
 
     def __iter__(self):
         """iterate over each implemented function"""
@@ -116,8 +137,8 @@ methods_implemented = [method for method in dir(VSMHelper) if method.startswith(
 
 def test_all_methods_implemented():
     methods_available = []
-    blacklisted_methods = ['save_image']
-    for method in dir(VisualizeSingleModel):
+    blacklisted_methods = ['save_image', 'RCO', 'model', 'models', 'hide_params']
+    for method in dir(VisualizeModel):
         if method.startswith('_') is False and method not in blacklisted_methods:
             methods_available.append(method)
 
@@ -126,9 +147,10 @@ def test_all_methods_implemented():
 
 
 def test_optimization_progress_empty_folder():
-    VSM_overwrite = VisualizeSingleModel(
-        path=image_folder,
+    VSM_overwrite = VisualizeModel(
+        image_path=image_folder,
         model=model,
+        models=models,
         rate_constant_optimizer=RCO,
         plot_title='empty folder',
         hide_params=None,
@@ -145,9 +167,10 @@ def test_optimization_progress_empty_folder():
 
 
 def test_no_accidental_overwrite():
-    VSM_no_overwrite = VisualizeSingleModel(
-        path=image_folder,
+    VSM_no_overwrite = VisualizeModel(
+        image_path=image_folder,
         model=model,
+        models=models,
         rate_constant_optimizer=RCO,
         plot_title='no overwrite',
         hide_params=None,
@@ -161,9 +184,10 @@ def test_no_accidental_overwrite():
 
 
 def test_overwriting():
-    VSM_overwrite = VisualizeSingleModel(
-        path=image_folder,
+    VSM_overwrite = VisualizeModel(
+        image_path=image_folder,
         model=model,
+        models=models,
         rate_constant_optimizer=RCO,
         plot_title='',
         hide_params=None,
@@ -178,5 +202,49 @@ def test_overwriting():
     assert L == list(image_folder.rglob('*.png'))
 
 
-def test_plot_path_in_pca(VSM_fixture):
-    VSM_fixture.plot_path_in_pca(PC1=1, PC2=2, file_name='pca_usecase1')
+def test_plot_path_in_pca(VM_fixture):
+    VM_fixture.plot_path_in_pca(PC1=1, PC2=2, file_name='pca_usecase1')
+
+
+def test_missing_parameters():
+    no_error = VisualizeModel(
+        image_path=image_folder,
+        model=model,
+        rate_constant_optimizer=RCO,
+        plot_title='',
+        hide_params=None,
+        dpi=300,
+        extensions='.png',
+        overwrite_image=True)
+
+    no_error.plot_optimization_progress(ratio=('A-blank', ['A-blank', 'B-blank', 'C-blank']))
+
+    no_RCO = VisualizeModel(
+        image_path=image_folder,
+        model=model,
+        # rate_constant_optimizer=RCO,
+        plot_title='',
+        hide_params=None,
+        dpi=300,
+        extensions='.png',
+        overwrite_image=True)
+
+    with pytest.raises(ValueError, match='Function plot_optimization_progress requires a rate_constant_optimizer'):
+        no_RCO.plot_optimization_progress(ratio=('A-blank', ['A-blank', 'B-blank', 'C-blank']))
+
+    no_model = VisualizeModel(
+        image_path=image_folder,
+        # model=model,
+        rate_constant_optimizer=RCO,
+        plot_title='',
+        hide_params=None,
+        dpi=300,
+        extensions='.png',
+        overwrite_image=True)
+
+    with pytest.raises(ValueError, match='Function plot_optimization_progress requires a model'):
+        no_model.plot_optimization_progress(ratio=('A-blank', ['A-blank', 'B-blank', 'C-blank']))
+
+    # different function name
+    with pytest.raises(ValueError, match='Function plot_rate_sensitivity requires a model'):
+        no_model.plot_rate_sensitivity(x_min=1e-6, x_max=100, steps=5)

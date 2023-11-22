@@ -1,7 +1,6 @@
 Visualize
 =========
-To visualize the data effectively several plotting functions have been created. The functions are split over the
-:class:`VisualizeSingleModel` and :class:`VisualizeMultipleSolutions`.
+To visualize the data effectively several plotting functions have been created.
 
 .. note::
 
@@ -9,8 +8,6 @@ To visualize the data effectively several plotting functions have been created. 
 
 .. py:currentmodule:: visualize
 
-.. autoclass:: VisualizeSingleModel
+.. autoclass:: VisualizeModel
     :members:
 
-.. autoclass:: VisualizeMultipleSolutions
-    :members:

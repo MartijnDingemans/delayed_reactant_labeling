@@ -12,6 +12,8 @@ import pandas as pd
 from matplotlib.colors import LogNorm, Normalize
 from sklearn.decomposition import PCA
 from tqdm import tqdm
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 
 from delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate, OptimizedModel, OptimizedMultipleModels
 from delayed_reactant_labeling.predict import InvalidPredictionError
@@ -148,7 +150,7 @@ class VisualizeModel:
             fig.savefig(self.path / f"{file_name}.{extension.split('.')[-1]}",  # remove leading .
                         dpi=self.dpi, bbox_inches='tight')
 
-    def plot_optimization_progress(self,
+    def plot_optimization_progress(self, *,
                                    file_name: Optional[str] = None,
                                    ratio: Optional[tuple[str, list[str]]] = None,
                                    n_points: int = 100,
@@ -281,7 +283,7 @@ class VisualizeModel:
         self.save_image(fig, file_name)
         return fig, axs
 
-    def plot_path_in_pca(self,
+    def plot_path_in_pca(self, *,
                          file_name: Optional[str] = None,
                          PC1: int = 0,
                          PC2: int = 1,
@@ -356,7 +358,7 @@ class VisualizeModel:
                               group_by: list[str],
                               ratio_of: list[str],
                               experimental: pd.DataFrame,
-                              prediction: pd.DataFrame,
+                              prediction: pd.DataFrame, *,
                               last_N: int = 100,
                               file_name: Optional[str] = None,
                               warn_label_assumption: bool = True,
@@ -446,7 +448,7 @@ class VisualizeModel:
         return fig, ax
 
     def plot_rate_over_time(
-            self,
+            self, *,
             file_name: Optional[str] = None,
             x_min: Optional[float] = None,
             x_max: Optional[float] = None,
@@ -497,7 +499,7 @@ class VisualizeModel:
 
     def plot_rate_sensitivity(self,
                               x_min: float,
-                              x_max: float,
+                              x_max: float, *,
                               file_name: Optional[str] = None,
                               max_error: Optional[float] = None,
                               steps: int = 101,
@@ -571,8 +573,11 @@ class VisualizeModel:
         self.save_image(fig, file_name)
         return fig, ax
 
-    def plot_error_all_runs(self, top_n: Optional[int] = None, file_name: Optional[str] = None, **fig_kwargs) -> tuple[
-        plt.Figure, plt.Axes]:
+    def plot_error_all_runs(self,
+                            top_n: Optional[int] = None, *,
+                            file_name: Optional[str] = None,
+                            **fig_kwargs
+                            ) -> tuple[plt.Figure, plt.Axes]:
         """Plots the error of each model.
 
         **requires multiple model**
@@ -594,7 +599,7 @@ class VisualizeModel:
 
         fig, ax = plt.subplots(**fig_kwargs)
         if top_n is None:
-            top_n = len(self.models.all_optimal_error.shape[0])
+            top_n = self.models.all_optimal_error.shape[0]
         ind = np.argsort(self.models.all_optimal_error)[:top_n]
         ax.scatter(np.arange(ind.shape[0]), self.models.all_optimal_error[ind])
         ax.set_xlabel('run number (sorted by error)')
@@ -603,7 +608,7 @@ class VisualizeModel:
         return fig, ax
 
     def plot_ratio_all_runs(self,
-                            ratio: list[str, list[str]],
+                            ratio: tuple[str, list[str]], *,
                             top_n: Optional[int] = 20,
                             file_name: Optional[str] = None,
                             **fig_kwargs) -> tuple[plt.Figure, plt.Axes]:
@@ -637,120 +642,132 @@ class VisualizeModel:
 
         found_ratio = []
         for run_index in ind:
-            pred = self.RCO.create_prediction(self.models.all_optimal_x[run_index].values,
-                                              self.models.all_optimal_x[run_index].index)
-            found_ratio.append(pred[ratio[0]] / pred[ratio[1]].sum(axis=1))
+            pred = self.RCO.create_prediction(self.models.all_optimal_x.iloc[run_index, :].values,
+                                              self.models.all_optimal_x.iloc[run_index, :].index)
+            found_ratio.append(
+                (pred[ratio[0]] / pred[ratio[1]].sum(axis=1)).iloc[-1]
+            )
 
         im = ax.scatter(np.arange(len(ind)),
-                        found_ratio[ind],
-                        c=self.models.all_optimal_error[ind],)
+                        found_ratio,
+                        c=self.models.all_optimal_error[ind], )
         fig.colorbar(im, ax=ax, label='error')
         ax.set_xlabel('run number (sorted by error)')
         ax.set_ylabel('ratio')
+
+        self.save_image(fig, file_name)
         return fig, ax
 
-    def show_rate_constants(self, max_error: float, index_constant_values: np.ndarray = None
-                            ) -> tuple[plt.Figure, plt.Axes]:
-        """TODO description
+    def plot_x_all_runs(self, index: slice, *,
+                        file_name: Optional[str] = None,
+                        **fig_kwargs
+                        ) -> tuple[plt.Figure, plt.Axes]:
+        """Plots a boxplot of the parameters for the selected runs.
 
         **requires multiple model**
 
         Args
         ----
+        index
+            The indices of the runs for which the parameters should be plotted.
+            index=slice(1, 5) would plot the results of runs 1 upto and including 4,
+            but the best run (0) would be skipped.
+            index=slice(-5, None) would plot the results for the 5 worst models.
         file_name
             The file name for the image. This should not include any extension.
-            If None (default), it is equal to TODO 'plot_rate_sensitivity'.
+            If None (default), it is equal to 'plot_x_all_runs'.
         **fig_kwargs
             Additional keyword arguments that are passed on to plt.subplots().
         """
         if file_name is None:
-            file_name = 'plot_rate_sensitivity'
+            file_name = 'plot_x_all_runs'
         self._image_exists(file_name)
 
-        ind_allowed_error = np.array(self.complete_found_error) < max_error
-        df = pd.DataFrame(np.array(self.complete_optimal_X)[ind_allowed_error], columns=self.x_description)
-        if index_constant_values is not None:
-            df = df.loc[:, ~index_constant_values]
-
-        fig, ax = plt.subplots(layout="tight")
-        ax.boxplot(df)
+        df = self.models.all_optimal_x.iloc[self.models.all_optimal_error.argsort()[index], ~self.hide_params]
+        fig, ax = plt.subplots(**fig_kwargs)
+        ax.boxplot(df.T)
         ax.set_title("distribution of optimal rates")
-        _ = ax.set_xticks(1 + np.arange(len(df.columns)), df.columns, rotation=90)
+        ax.set_xticks(1 + np.arange(len(df.columns)))
+        ax.set_xticklabels(df.columns, rotation=90)
         ax.set_yscale("log")
-        ax.set_ylabel("value of k")
+        ax.set_ylabel("parameter intensity")
+        self.save_image(fig, file_name)
         return fig, ax
 
-    def show_biplot(self,
-                    max_error: float,
-                    pc1: int = 0,
-                    pc2: int = 1,
-                    ax: plt.Axes = None):
-        """TODO description
+    def plot_biplot_all_runs(self,
+                             index: slice, *,
+                             file_name: Optional[str] = None,
+                             PC1: int = 0,
+                             PC2: int = 1,
+                             **fig_kwargs
+                             ) -> tuple[plt.Figure, plt.Axes]:
+        """Plots a biplot of the initial and optimal parameters per run.
+        This is a dimensionally reduced PCA plot, where the loadings and scores are plotted simultaneously.
+        The data is autoscaled (mean=0, std=1) before any analysis, to ensure that its not the scale of a parameter,
+        but its deviations which impact the plot.
 
         **requires multiple model**
 
         Args
         ----
+        index
+            The indices of the runs, when sorted by error, for which the parameters should be plotted.
+            index=slice(1, 5) would plot the results of runs 1 upto and including 4,
+            but the best run (0) would be skipped.
+            index=slice(-5, None) would plot the results for the 5 worst models.
+        PC1, PC2
+            The principal components that should be plotted against each other.
         file_name
             The file name for the image. This should not include any extension.
-            If None (default), it is equal to TODO 'plot_rate_sensitivity'.
+            If None (default), it is equal to 'plot_biplot_all_runs'.
         **fig_kwargs
             Additional keyword arguments that are passed on to plt.subplots().
         """
         if file_name is None:
-            file_name = 'plot_rate_sensitivity'
+            file_name = 'plot_biplot_all_runs'
         self._image_exists(file_name)
 
-        from sklearn.decomposition import PCA
-        from sklearn.preprocessing import StandardScaler
+        index = self.models.all_optimal_error.argsort()[index]
 
-        if ax is None:
-            fig, ax = plt.subplots()
-        else:
-            fig = ax.figure
+        data_initial = self.models.all_initial_x.iloc[index, ~self.hide_params].to_numpy()
+        data_optimal = self.models.all_optimal_x.iloc[index, ~self.hide_params].to_numpy()
+        data = np.concatenate([data_initial, data_optimal], axis=0)
 
-        data = []
-        for error, initial, optimal in zip(self.complete_found_error, self.complete_initial_X, self.complete_optimal_X):
-            if error > max_error:
-                continue
-            data.append(initial)
-            data.append(optimal)
-
-        data = pd.DataFrame(data).reset_index(
-            drop=True)  # by converting to df first, we assure that the columns are aligned
         scaler = StandardScaler()
-        scaler.fit(X=data.to_numpy())  # scale each rate so its std deviation becomes 1
-        pca = PCA().fit(X=scaler.transform(data.to_numpy()))
+        pca = PCA().fit(X=scaler.fit_transform(data))
+
+        fig, ax = plt.subplots(**fig_kwargs)
 
         # scores
-        for error, initial, optimal in zip(self.complete_found_error, self.complete_initial_X, self.complete_optimal_X):
-            if error > max_error:
-                continue
-            ax.scatter(
-                x=scaler.transform(initial.to_numpy().reshape(1, -1)).dot(pca.components_[pc1]),
-                y=scaler.transform(initial.to_numpy().reshape(1, -1)).dot(pca.components_[pc2]),
-                marker='o', color='tab:blue'
-            )
-            ax.scatter(
-                x=scaler.transform(optimal.to_numpy().reshape(1, -1)).dot(pca.components_[pc1]),
-                y=scaler.transform(optimal.to_numpy().reshape(1, -1)).dot(pca.components_[pc2]),
-                marker='*', color='tab:orange'
-            )
-        ax.scatter(np.nan, np.nan, color="tab:blue", marker="o", label="initial")
-        ax.scatter(np.nan, np.nan, color="tab:orange", marker="*", label="optimal")
+        im = ax.scatter(
+            scaler.transform(data_initial).dot(pca.components_[PC1]),
+            scaler.transform(data_initial).dot(pca.components_[PC2]),
+            marker='.', c=self.models.all_optimal_error[index]
+        )
+        ax.scatter(
+            scaler.transform(data_optimal).dot(pca.components_[PC1]),
+            scaler.transform(data_optimal).dot(pca.components_[PC2]),
+            marker='*', c=self.models.all_optimal_error[index]
+        )
+
+        # legend
+        ax.scatter(np.nan, np.nan, color="k", marker=".", label="initial")
+        ax.scatter(np.nan, np.nan, color="k", marker="*", label="optimal")
         ax.legend()
 
         # maximize the size of the loadings
-        x_factor = abs(np.array(ax.get_xlim())).min() / pca.components_[pc1].max()
-        y_factor = abs(np.array(ax.get_ylim())).min() / pca.components_[pc2].max()
+        x_factor = abs(np.array(ax.get_xlim())).min() / pca.components_[PC1].max()
+        y_factor = abs(np.array(ax.get_ylim())).min() / pca.components_[PC2].max()
 
         # loadings
-        for rate, loading1, loading2 in zip(data.columns, pca.components_[pc1], pca.components_[pc2]):
+        for rate, loading1, loading2 in zip(self.models.x_description[~self.hide_params], pca.components_[PC1], pca.components_[PC2]):
             ax.plot([0, loading1 * x_factor], [0, loading2 * y_factor], color='tab:gray')
             ax.text(loading1 * x_factor, loading2 * y_factor, rate, ha='center', va='bottom')
 
-        ax.set_title('biplot')
-        ax.set_xlabel(f'PC {pc1}, explained variance {pca.explained_variance_ratio_[pc1]:.2f}')
-        ax.set_ylabel(f'PC {pc2}, explained variance {pca.explained_variance_ratio_[pc2]:.2f}')
+        ax.set_xlabel(f'PC {PC1}, explained variance {pca.explained_variance_ratio_[PC1]:.2f}')
+        ax.set_ylabel(f'PC {PC2}, explained variance {pca.explained_variance_ratio_[PC2]:.2f}')
 
+        fig.colorbar(im, label='error')
+
+        self.save_image(fig, file_name)
         return fig, ax
