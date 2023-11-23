@@ -8,21 +8,23 @@ robust.
 Rate equations
 --------------
 To be able to calculate the rate of change per chemical as a function of the current concentrations in the system,
-the :class:`predict.DRL` class analyzes the reactions. The rate equation of each chemical can be decomposed into the
-rate equations caused by each reaction step in the system. These reaction steps are what the user inputs into the model.
+the :class:`predict.DRL` class analyzes the reactions. The rate equation of each chemical for the complete model
+can be decomposed into the rate equations caused by each reaction step in the system.
+These reaction steps are what the user inputs into the model.
 
 .. math::
 
     \frac{dc}{dt} = \sum_{r}{ \frac{dc_r}{dt} }
 
-For each reaction we can calculate the amount of created chemical:
+We can first initialize an array for :math:`dc/dt` filled with zeros, subsequently loop over each reaction step, and
+calculate the amount of created chemical(s) as follows:
 
 .. math::
 
-    dc_r = k_r \cdot \prod{[q_r]}
+    \frac{dc_r}{dt} = k_r \prod{[q_r]}
 
-where, :math:`k` is the rate constant for reaction :math:`r` with reactants :math:`q`. We can subtract this amount of created chemical from each reactant, and
-add it to each product to get the rate of change.
+where, :math:`k` is the rate constant for reaction :math:`r` with reactants :math:`q`. We add this amount to each
+product of the reaction step, whereas we subtract it from each reactant.
 
 .. _Jacobian:
 
@@ -34,16 +36,19 @@ model into individual reaction steps:
 
 .. math::
 
-    J_{i, j} =  \frac{\delta i}{\delta j} = \sum_{r}{\frac{\delta i_r}{\delta j}}
+    J_{i, j} =  \frac{\delta (di/dt)}{\delta j} = \sum_{r}{\frac{\delta (di_r/dt)}{\delta j}}
 
-For each reaction we than calculate the derivative with respect to each reactant. This is because the rate equation
-due to this reaction is by definition the rate constant multiplied by the concentration of each reactant, and the derivative
-with respect to non-reactants is zero. To calculate the derivative we than take the product of the concentrations of all
-reactants, :math:`q`, except the reactant whose derivative we take.
+We can again initialize a matrix containing only zeros, loop over each reaction step, and calculate the partial
+derivative with respect to each reactant. Partial derivatives with respect to a product do not have to be considered
+as the corresponding rate equation would not contain a term including it and therefore be zero
+(:math:`d(k \cdot a \cdot b)/dc=0`, whereas :math:`d(k \cdot a \cdot b)/db=k \cdot a`).
+
+To calculate the partial derivative we than take the product of the concentrations of all reactants, :math:`q`,
+except the reactant whose derivative we take.
 
 .. math::
 
-    \frac{\delta i_r}{\delta j} = k_r \cdot \prod^{q_r}_{q_r \ne j}{[q_r]}
+    \frac{\delta (di_r/dt)}{\delta j} = k_r \cdot \prod^{q_r}_{q_r \ne j}{[q_r]}
 
 Subsequently we multiply this with the rate constant, :math:`k`, and add this to all reaction products, whereas
 we subtract it from each reactant. Because we take a very simple approach to calculating the derivative, this method only
