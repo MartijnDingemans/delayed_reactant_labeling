@@ -296,8 +296,8 @@ class DRL:
 
         Warning
         -------
-        It is less accurate and slower compared to using an ODE solver such as implemented
-        for :meth:`predict_concentration`.
+        This method is less accurate and slower compared to using an ODE solver such as implemented
+        in :meth:`predict_concentration`.
 
         Args
         ----
