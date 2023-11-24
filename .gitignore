@@ -6,9 +6,6 @@ pyproject.toml
 /src/delayed_reactant_labeling.egg-info/
 /docs/build/
 /dist/
-/examples/optimization/
-/examples/model_boundaries/optimization/
-/examples/docs/optimization/
-/examples/docs/optimization_multiple
-/tests/complete_optimization/images/
-/tests/optimization/
+**/*optimization*/**
+/max/
+**/*model_boundaries*/*.xlsx
