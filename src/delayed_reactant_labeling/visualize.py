@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.colors import LogNorm, Normalize
-from sklearn.decomposition import PCA
 from tqdm import tqdm
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
@@ -129,7 +128,7 @@ class VisualizeModel:
 
     def save_image(self, fig, file_name, tight_layout=True):
         """Saves an image with all relevant extensions, and the correct dpi.
-        It will be stored in the folder, specified by the ``path``.
+        It will be stored in the folder, specified by the ``image_path``.
 
         Args
         ----
@@ -208,7 +207,9 @@ class VisualizeModel:
                         xtick_rotation: float = 0,
                         **fig_kwargs
                         ) -> tuple[plt.Figure, np.ndarray[plt.Axes]]:
-        """Plots the data in args, and allows easy grouping with respect to their index.
+        """Plots a bar plot of the data in args, and allows easy grouping with respect to their index.
+        For example, plot_grouped_by(x1, x2) would create a bar plot of the two series,
+        where, for each parameter, the values in x1 and x2 would be compared.
 
         **requires no model**
 
@@ -225,7 +226,7 @@ class VisualizeModel:
             Group the parameters by a key.
             Each parameter can only be matched with one key exactly.
         show_remaining
-            Show the parameter which were not matched by any key in group_as.
+            Show the parameters which were not matched by any key in group_as.
         xtick_rotation
             The rotation of the x ticks in degrees.
         **fig_kwargs
@@ -266,7 +267,6 @@ class VisualizeModel:
         axs = axs.flatten()
         flx, frx = np.inf, -np.inf  # furthest left, furthest right.
         for ax, (group_key, selected_x) in zip(axs, key_hits.iterrows()):
-            ax.set_ylabel(group_key)
             data.loc[:, selected_x].T.plot.bar(ax=ax)
 
             lx, rx = ax.get_xlim()
@@ -285,11 +285,13 @@ class VisualizeModel:
 
     def plot_path_in_pca(self, *,
                          file_name: Optional[str] = None,
-                         PC1: int = 0,
-                         PC2: int = 1,
+                         pc1: int = 0,
+                         pc2: int = 1,
                          **fig_kwargs
                          ) -> tuple[plt.Figure, np.ndarray[plt.Axes]]:
         """Plots the path in the dimensionally reduced space (by means of principal component analysis).
+        The data is standard-scaled (mean=0, std=1) before any analysis,
+        to ensure that it is not the scale of a parameter, but its deviation, which impacts the plot.
 
         **requires a single model**
 
@@ -298,10 +300,8 @@ class VisualizeModel:
         file_name
             The file name for the image. This should not include any extension.
             If None (default), it is equal to 'plot_path_in_pca'.
-        PC1
-            The first principal component that should be plotted.
-        PC2
-            The second principal component that should be plotted.
+        pc1, pc2
+            The principal components that should be plotted.
         **fig_kwargs
             Additional keyword arguments that are passed on to plt.Figure().
 
@@ -321,9 +321,10 @@ class VisualizeModel:
                               wspace=0.05, hspace=0.05)
 
         ax = fig.add_subplot(gs[0, 1])
-        pca = PCA().fit(X=self.model.all_x)
-        scattered = ax.scatter(self.model.all_x.dot(pca.components_[PC1]),
-                               self.model.all_x.dot(pca.components_[PC2]),
+        scaler = StandardScaler()
+        pca = PCA().fit(X=scaler.fit_transform(self.model.all_x))
+        scattered = ax.scatter(self.model.all_x.dot(pca.components_[pc1]),
+                               self.model.all_x.dot(pca.components_[pc2]),
                                c=np.arange(len(self.model.all_x)))
         ax.tick_params(bottom=False, left=False, labelbottom=False, labelleft=False)
         ax_bbox = ax.get_position(original=True)
@@ -338,15 +339,15 @@ class VisualizeModel:
         x = np.arange(sum(~self.hide_params))
         ticks = self.model.x_description[~self.hide_params].to_list()
 
-        ax_pc0.bar(x, pca.components_[PC1][~self.hide_params])
-        ax_pc1.barh(x, pca.components_[PC2][~self.hide_params])
+        ax_pc0.bar(x, pca.components_[pc1][~self.hide_params])
+        ax_pc1.barh(x, pca.components_[pc2][~self.hide_params])
 
-        ax_pc0.set_xlabel(f"component {PC1}, explained variance {pca.explained_variance_ratio_[PC1]:.2f}")
+        ax_pc0.set_xlabel(f"component {pc1}, explained variance {pca.explained_variance_ratio_[pc1]:.2f}")
         ax_pc0.set_xticks(x)
         ax_pc0.set_xticklabels(ticks, rotation=90, fontsize='small')
         ax_pc0.tick_params(left=False)
 
-        ax_pc1.set_ylabel(f"component {PC2}, explained variance {pca.explained_variance_ratio_[PC2]:.2f}")
+        ax_pc1.set_ylabel(f"component {pc2}, explained variance {pca.explained_variance_ratio_[pc2]:.2f}")
         ax_pc1.set_yticks(x)
         ax_pc1.set_yticklabels(ticks, fontsize="small")
         ax_pc1.tick_params(bottom=False)
@@ -359,8 +360,8 @@ class VisualizeModel:
                               ratio_of: list[str],
                               experimental: pd.DataFrame,
                               prediction: pd.DataFrame, *,
-                              last_N: int = 100,
                               file_name: Optional[str] = None,
+                              last_N: int = 100,
                               warn_label_assumption: bool = True,
                               **fig_kwargs
                               ) -> tuple[plt.Figure, plt.Axes]:
@@ -437,7 +438,7 @@ class VisualizeModel:
                                alpha=0.7, s=100)
 
         analyze_data(experimental, marker='_', descr='exp')
-        analyze_data(prediction, marker='|', descr='pred')
+        analyze_data(prediction, marker='.', descr='pred')
         ax.legend(ncol=2)
         ax.set_ylabel('fraction')
         ax.set_xticks(np.arange(len(group_by)))
@@ -464,10 +465,9 @@ class VisualizeModel:
         file_name
             The file name for the image. This should not include any extension.
             If None (default), it is equal to 'plot_rate_over_time'.
-        x_min
-            Plot values lower than the min as the min.
-        x_max
-            Plot values lwoer than the max as the max.
+        x_min, x_max
+            The values outside the range x_min to x_max will be plotted as x_min or x_max.
+
         log_scale
             If true the data will be plotted on log_scale.
         **fig_kwargs
@@ -511,10 +511,8 @@ class VisualizeModel:
 
         Args
         ----
-        x_min
-            The minimum value for x.
-        x_max
-            The maximum value for x
+        x_min, x_max
+            The minimum and maximum value x.
         file_name
             The file name for the image. This should not include any extension.
             If None (default), it is equal to 'plot_rate_sensitivity'.
@@ -600,8 +598,7 @@ class VisualizeModel:
         fig, ax = plt.subplots(**fig_kwargs)
         if top_n is None:
             top_n = self.models.all_optimal_error.shape[0]
-        ind = np.argsort(self.models.all_optimal_error)[:top_n]
-        ax.scatter(np.arange(ind.shape[0]), self.models.all_optimal_error[ind])
+        ax.scatter(np.arange(top_n), self.models.all_optimal_error[:top_n])
         ax.set_xlabel('run number (sorted by error)')
         ax.set_ylabel('error')
         self.save_image(fig, file_name)
@@ -609,8 +606,8 @@ class VisualizeModel:
 
     def plot_ratio_all_runs(self,
                             ratio: tuple[str, list[str]], *,
-                            top_n: Optional[int] = 20,
                             file_name: Optional[str] = None,
+                            top_n: Optional[int] = 20,
                             **fig_kwargs) -> tuple[plt.Figure, plt.Axes]:
         """Plots the expected ratio with respect to each model, which are sorted on their performance.
 
@@ -621,11 +618,10 @@ class VisualizeModel:
         ratio
              The first element indicates the chemical of interest,
              and the second element the chemicals it is compared to.
-             For example (‘A’, [‘A’, ‘B’]), calculates $$A/(A+B)$$.
+             For example (‘A’, [‘A’, ‘B’]), calculates :math:`A/(A+B)`.
              It will plot the ratio for the last time point in each model.
         top_n
             How many of the best runs should be plotted.
-            If None (default), all runs will be plotted.
         file_name
             The file name for the image. This should not include any extension.
             If None (default), it is equal to 'plot_ratio_all_runs'.
@@ -636,21 +632,19 @@ class VisualizeModel:
             file_name = 'plot_ratio_all_runs'
         self._image_exists(file_name)
 
-        fig, ax = plt.subplots(**fig_kwargs)
-
-        ind = np.argsort(self.models.all_optimal_error)[:top_n]
+        if top_n > self.models.all_optimal_error.shape[0]:
+            top_n = self.models.all_optimal_error.shape[0]
 
         found_ratio = []
-        for run_index in ind:
+        for run_index in range(top_n):
             pred = self.RCO.create_prediction(self.models.all_optimal_x.iloc[run_index, :].values,
                                               self.models.all_optimal_x.iloc[run_index, :].index)
-            found_ratio.append(
-                (pred[ratio[0]] / pred[ratio[1]].sum(axis=1)).iloc[-1]
-            )
+            found_ratio.append((pred[ratio[0]] / pred[ratio[1]].sum(axis=1)).iloc[-1])
 
-        im = ax.scatter(np.arange(len(ind)),
+        fig, ax = plt.subplots(**fig_kwargs)
+        im = ax.scatter(np.arange(top_n),
                         found_ratio,
-                        c=self.models.all_optimal_error[ind], )
+                        c=self.models.all_optimal_error[:top_n], )
         fig.colorbar(im, ax=ax, label='error')
         ax.set_xlabel('run number (sorted by error)')
         ax.set_ylabel('ratio')
@@ -683,7 +677,8 @@ class VisualizeModel:
             file_name = 'plot_x_all_runs'
         self._image_exists(file_name)
 
-        df = self.models.all_optimal_x.iloc[self.models.all_optimal_error.argsort()[index], ~self.hide_params]
+        # iloc for index, loc for boolean mask
+        df = self.models.all_optimal_x.iloc[index, :].loc[:, ~self.hide_params]
         fig, ax = plt.subplots(**fig_kwargs)
         ax.boxplot(df.T)
         ax.set_title("distribution of optimal rates")
@@ -697,14 +692,14 @@ class VisualizeModel:
     def plot_biplot_all_runs(self,
                              index: slice, *,
                              file_name: Optional[str] = None,
-                             PC1: int = 0,
-                             PC2: int = 1,
+                             pc1: int = 0,
+                             pc2: int = 1,
                              **fig_kwargs
                              ) -> tuple[plt.Figure, plt.Axes]:
         """Plots a biplot of the initial and optimal parameters per run.
         This is a dimensionally reduced PCA plot, where the loadings and scores are plotted simultaneously.
-        The data is autoscaled (mean=0, std=1) before any analysis, to ensure that its not the scale of a parameter,
-        but its deviations which impact the plot.
+        The data is standard-scaled (mean=0, std=1) before any analysis,
+        to ensure that it is not the scale of a parameter, but its deviation, which impacts the plot.
 
         **requires multiple model**
 
@@ -715,7 +710,7 @@ class VisualizeModel:
             index=slice(1, 5) would plot the results of runs 1 upto and including 4,
             but the best run (0) would be skipped.
             index=slice(-5, None) would plot the results for the 5 worst models.
-        PC1, PC2
+        pc1, pc2
             The principal components that should be plotted against each other.
         file_name
             The file name for the image. This should not include any extension.
@@ -727,10 +722,8 @@ class VisualizeModel:
             file_name = 'plot_biplot_all_runs'
         self._image_exists(file_name)
 
-        index = self.models.all_optimal_error.argsort()[index]
-
-        data_initial = self.models.all_initial_x.iloc[index, ~self.hide_params].to_numpy()
-        data_optimal = self.models.all_optimal_x.iloc[index, ~self.hide_params].to_numpy()
+        data_initial = self.models.all_initial_x.iloc[index, :].loc[:, ~self.hide_params].to_numpy()
+        data_optimal = self.models.all_optimal_x.iloc[index, :].loc[:, ~self.hide_params].to_numpy()
         data = np.concatenate([data_initial, data_optimal], axis=0)
 
         scaler = StandardScaler()
@@ -740,13 +733,13 @@ class VisualizeModel:
 
         # scores
         im = ax.scatter(
-            scaler.transform(data_initial).dot(pca.components_[PC1]),
-            scaler.transform(data_initial).dot(pca.components_[PC2]),
+            scaler.transform(data_initial).dot(pca.components_[pc1]),
+            scaler.transform(data_initial).dot(pca.components_[pc2]),
             marker='.', c=self.models.all_optimal_error[index]
         )
         ax.scatter(
-            scaler.transform(data_optimal).dot(pca.components_[PC1]),
-            scaler.transform(data_optimal).dot(pca.components_[PC2]),
+            scaler.transform(data_optimal).dot(pca.components_[pc1]),
+            scaler.transform(data_optimal).dot(pca.components_[pc2]),
             marker='*', c=self.models.all_optimal_error[index]
         )
 
@@ -756,17 +749,16 @@ class VisualizeModel:
         ax.legend()
 
         # maximize the size of the loadings
-        x_factor = abs(np.array(ax.get_xlim())).min() / pca.components_[PC1].max()
-        y_factor = abs(np.array(ax.get_ylim())).min() / pca.components_[PC2].max()
+        x_factor = abs(np.array(ax.get_xlim())).min() / pca.components_[pc1].max()
+        y_factor = abs(np.array(ax.get_ylim())).min() / pca.components_[pc2].max()
 
         # loadings
-        for rate, loading1, loading2 in zip(self.models.x_description[~self.hide_params], pca.components_[PC1], pca.components_[PC2]):
+        for rate, loading1, loading2 in zip(self.models.x_description[~self.hide_params], pca.components_[pc1], pca.components_[pc2]):
             ax.plot([0, loading1 * x_factor], [0, loading2 * y_factor], color='tab:gray')
             ax.text(loading1 * x_factor, loading2 * y_factor, rate, ha='center', va='bottom')
 
-        ax.set_xlabel(f'PC {PC1}, explained variance {pca.explained_variance_ratio_[PC1]:.2f}')
-        ax.set_ylabel(f'PC {PC2}, explained variance {pca.explained_variance_ratio_[PC2]:.2f}')
-
+        ax.set_xlabel(f'PC {pc1}, explained variance {pca.explained_variance_ratio_[pc1]:.2f}')
+        ax.set_ylabel(f'PC {pc2}, explained variance {pca.explained_variance_ratio_[pc2]:.2f}')
         fig.colorbar(im, label='error')
 
         self.save_image(fig, file_name)
