@@ -7,16 +7,17 @@ from copy import deepcopy
 
 import matplotlib
 import matplotlib.pyplot as plt
+
 matplotlib.use('Agg')
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize, Bounds
 
-from delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate
+from delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate, OptimizedMultipleModels
 from delayed_reactant_labeling.predict import DRL
-from delayed_reactant_labeling.visualize import VisualizeMultipleSolutions
 
 NOISE_LEVEL = 0.02
+STATIC_NOISE = True
 RATE_CONSTANTS_ROELANT = pd.Series({
     'k1_D': 1.5,
     'k1_E': 0.25,
@@ -96,8 +97,12 @@ def METRIC(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     return np.average(np.abs(y_pred - y_true), weights=WEIGHT_TIME, axis=0)
 
 
-def optimize(compounds: list[str], calculate=True, noise_level=NOISE_LEVEL):
-    path = pathlib.Path(f'./optimization/noise_{noise_level}_compounds_{"_".join(compounds).replace("/", "and")}/')
+def optimize(compounds: list[str], calculate=True, noise_level=NOISE_LEVEL, static_noise=STATIC_NOISE):
+    path = f'./optimization/noise_{noise_level}_compounds_{"_".join(compounds).replace("/", "and")}'
+    if static_noise:
+        path = f'{path}_STATIC'
+    path = pathlib.Path(path)
+
     if calculate:
         path.mkdir(exist_ok=False, parents=True)
 
@@ -199,12 +204,15 @@ def optimize(compounds: list[str], calculate=True, noise_level=NOISE_LEVEL):
             return weighed_errors
 
     def create_data():
+        if not path.exists():
+            path.mkdir(parents=True)
+
         if combine_4_5:
             x = RATE_CONSTANTS_ROELANT.copy()
             x['ion'] = 0.025
         else:
             x = RATE_CONSTANTS_ROELANT.copy()
-        real_data = RateConstantOptimizer.create_prediction(  # you can use static methods
+        real_data = RateConstantOptimizer.create_prediction(
             x=x.values, x_description=list(x.keys()))
         fig, axs = plot_data(real_data)
         fig.suptitle('raw concentrations')
@@ -220,7 +228,12 @@ def optimize(compounds: list[str], calculate=True, noise_level=NOISE_LEVEL):
             fake_data_columns.append(chemical)
             noise_dynamic = noise_level * rng.normal(loc=0, scale=1, size=real_data[chemical].size) * real_data[
                 chemical]
-            fake_data.append(ion_factor * (real_data[chemical] + noise_dynamic))
+            fake_col = ion_factor * (real_data[chemical] + noise_dynamic)
+            if static_noise:
+                fake_col += rng.normal(loc=0, scale=0.000001 / 4, size=real_data[chemical].size)
+                fake_col[fake_col <= 1e-15] = 1e-15  # no negative numbers
+
+            fake_data.append(fake_col)
 
         for compound in compounds:
             if compound == 'cat':
@@ -315,8 +328,7 @@ def optimize(compounds: list[str], calculate=True, noise_level=NOISE_LEVEL):
             maxiter=200000,
         )
     else:
-        plt.show()
-        VMS = VisualizeMultipleSolutions(path)
+        # "real" x / x description, from Hilgers et al.
         x = RATE_CONSTANTS_ROELANT.to_list()
         x_description = list(RATE_CONSTANTS_ROELANT.keys())
         x = np.array(x + [0.025]) if combine_4_5 else np.array(x)
@@ -328,9 +340,8 @@ def optimize(compounds: list[str], calculate=True, noise_level=NOISE_LEVEL):
         total_error_real = RCO.calculate_total_error(errors_real)
 
         # using best found values
-        sorted_index = VMS.complete_found_error.argsort()
-        best_run = sorted_index[0]
-        best_X = pd.Series(VMS.complete_optimal_X[best_run], index=VMS.x_description)
+        models = OptimizedMultipleModels(path)
+        optimal_x = models.best.optimal_x
 
         out = pd.Series({
             "noise": noise_level,
@@ -342,25 +353,40 @@ def optimize(compounds: list[str], calculate=True, noise_level=NOISE_LEVEL):
             "4/5": "4/5" in compounds,
             "6": "6" in compounds,
             "real_error": total_error_real,
-            "best_error": VMS.complete_found_error[best_run],
-            "n_runs": VMS.complete_found_error.shape[0],
+            "best_error": models.best.optimal_error,
+            "n_runs": models.all_optimal_error.shape[0],
         }, name=path.parts[-1])
+
         real_rates = pd.Series(x, x_description)
-        for index in best_X.keys():
+        for index in optimal_x.keys():
             if real_rates[index] == 0:  # disabled reaction
                 continue
-            out[f'_{index}/real'] = best_X[index] / real_rates[index]
+            out[f'_{index}/real'] = optimal_x[index] / real_rates[index]
 
-        for index in best_X.keys():
-            out[index] = best_X[index]
+        for index in optimal_x.keys():
+            out[index] = optimal_x[index]
 
-        pred = RCO.create_prediction(best_X.values, x_description=VMS.x_description)
+        pred = RCO.create_prediction(optimal_x.values, x_description=models.x_description)
         errors = RCO.calculate_errors(pred)
         for descr, error in errors.items():
             out[descr] = error
 
         for descr, error in errors_real.items():
             out[f'real_{descr}'] = error
+
+        try:
+            from delayed_reactant_labeling.visualize import VisualizeModel
+            VM = VisualizeModel(
+                image_path=path,
+                models=models,
+                rate_constant_optimizer=RCO,
+                plot_title=path.parts[-1].replace('_', ' '), extensions='.png')
+            VM.plot_error_all_runs()
+            VM.plot_error_all_runs(20, file_name='plot_error_all_runs_zoom_in')
+            VM.plot_x_all_runs(slice(10), file_name='plot_x_all_runs')
+        except Exception as e:
+            warnings.warn(f'Exception occured when plotting at {path}\n{e}')
+
         return out
 
 
@@ -371,7 +397,19 @@ if __name__ == '__main__':
         items = _path.split('_')
         assert items[0] == 'noise'
         assert items[2] == 'compounds'
-        df.append(optimize(compounds=items[3:], calculate=False, noise_level=int(items[1])))
+
+        if items[-1] == 'STATIC':
+            _compounds = items[3:-1]
+            static = True
+        else:
+            _compounds = items[3:]
+            static = False
+
+        try:
+            df.append(optimize(compounds=_compounds, calculate=False, noise_level=float(items[1]), static_noise=static))
+        except Exception as e:
+            warnings.warn(f'Warning occured at {_path}:\n{e}')
+        plt.close('all')
 
     df = pd.DataFrame(df)
     # TODO sort index
