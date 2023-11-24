@@ -4,7 +4,7 @@ import pytest
 from pytest import approx, raises
 import numpy as np
 from delayed_reactant_labeling.predict import DRL
-from delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate
+from delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate, OptimizedMultipleModels
 import pandas as pd
 from scipy.optimize import Bounds
 
@@ -131,4 +131,17 @@ def test_throws_error_upon_nan_error():
 
     with pytest.raises(ValueError):
         _RCO.calculate_errors(pred)
+
+
+def test_optimized_models():
+    models = OptimizedMultipleModels('./complete_multiple_optimization')
+    assert (models.best.optimal_x == models.all_optimal_x.iloc[0, :]).all()  # could also happen by chance
+    assert (models.all_initial_x.index == models.all_optimal_x.index).all()
+    assert pd.Series(models.all_optimal_error).is_monotonic_increasing
+
+    for n, (guess, x) in enumerate(models.all_optimal_x.iterrows()):
+        print(n, guess)
+        pred = RCO.create_prediction(x.values, x.index)
+        errors = RCO.calculate_errors(pred)
+        assert RCO.calculate_total_error(errors) == approx(models.all_optimal_error[n])
 
