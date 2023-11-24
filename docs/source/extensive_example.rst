@@ -253,6 +253,10 @@ The next step is to the create our RateConstantOptimizer class. We will apply th
 2. isomer ratio: The ratio of e.g. 3D / (3D + 3E + 3F).
 3. TIC shape: how well the curve represent the shape of the TIC curve.
 
+It is important to note that we should not fit on the TIC if we have normalized the data with respect to it. If we
+consider the system A -> B, where the ionization efficiency are 1 for A, 2 for B respectively, we can see that the
+total TIC will increase over time. By normalizing with respect to the TIC we remove this information from the data.
+
 We will apply weights to each type of error to make sure that the system prioritizes getting the label ratio right, but
 would see it as a benefit if the isomer ratio also fits well. In the optimized model the three different kinds of error
 are relatively similar to each other in the contribution to the total error. The weight of all isomers F has been
@@ -310,7 +314,8 @@ drastically decreased because of the large amount of noise in this data.
                 sum_all_isomers = data[[f'{intermediate}{isomer}' for isomer in ISOMERS]].sum(axis=1)
                 for isomer in ISOMERS:
                     chemical = f"{intermediate}{isomer}"  # 3D, 3E, 3F, 4/5D, 4/5E, 3/5F
-                    chemical_iso_split = f"int_{intermediate}_iso_{isomer}"  # allows for easy modification of weight. str.contains('int_1') is much more specific than just '1'
+                    # allows for easy modification of weight. str.contains('int_1') is much more specific than just '1'
+                    chemical_iso_split = f"int_{intermediate}_iso_{isomer}"
 
                     sum_chemical = data[[chemical, f"{chemical}'"]].sum(axis=1)
 
@@ -390,11 +395,11 @@ Or multiple times:
 
     RCO.optimize_multiple(
         path='./optimization_multiple/',
-        n_runs=42,
+        n_runs=200,  # This take a long while ...
         x_description=dimension_descriptions,
         x_bounds=bounds,
-        maxiter=200,
-        n_jobs=-2,  # uses all but 1 cpu cores available
+        maxiter=100000,
+        n_jobs=-1,   # uses all but 1 cpu cores available; this took a day or 2 ...
     )
 
 .. _extensiveVisuals:
@@ -405,25 +410,29 @@ The :class:`visualize.VisualizeSingleModel` can be used to make various kinds of
 
 .. code-block:: python
 
-    from delayed_reactant_labeling.optimize import OptimizedModel
-    from delayed_reactant_labeling.visualize import VisualizeSingleModel
+    from delayed_reactant_labeling.optimize import OptimizedMultipleModels
+    from delayed_reactant_labeling.visualize import VisualizeModel
 
-    model  = OptimizedModel('./optimization/')
-    VSM = VisualizeSingleModel(
-        path='./images/',
-        model=model,
+    models = OptimizedMultipleModels('./optimization_multiple')
+
+    VM = VisualizeModel(
+        image_path='./images/',
+        model=models.best,  # this assumption would be made automatically, but raises a warning
+        models=models,
         rate_constant_optimizer=RCO,
-        hide_params=constraints['upper']==0,
-        extensions=['.png', 'svg'])  # having a leading . does not matter
+        hide_params=constraints['upper'] == 0,
+        extensions=['.png', 'svg'], overwrite_image=True)  # having a leading '.' does not matter
 
+Model progression
+~~~~~~~~~~~~~~~~~
 The ratio of 6D to 6D + 6E can be plotted together with the error of the model as a function of the iteration number.
 
 .. code-block:: python
 
-    VSM.plot_optimization_progress(ratio=['6D', ['6D', '6E']])
+    VM.plot_optimization_progress(ratio=('6D', ['6D', '6E']))
 
 .. image:: images/extensive_example/plot_optimization_progress.png
-    :width: 600
+    :width: 640
     :align: center
 
 We can plot its path through a dimensionally reduced space as follows:
@@ -431,15 +440,17 @@ The figsize keyword is supplied to ensure that the figure is square.
 
 .. code-block:: python
 
-    VSM.plot_path_in_pca(PC1=0, PC2=1, figsize=(6.4, 6.4))
+    VM.plot_path_in_pca(PC1=0, PC2=1, figsize=(6.4, 6.4))
 
 .. image:: images/extensive_example/plot_path_in_pca.png
-    :width: 600
+    :width: 640
     :align: center
 
+Model output
+~~~~~~~~~~~~
 The found rate constants can easily be plotted using the ``plot_grouped_by`` function. From this we can see
-that most of the found rate constants in our model are similar in size to those found by Hilgers.
-However, the backwards reactions seem to have a large difference.
+that there are large deviations compared to the constants that Hilgers found. See the section :ref:`visualize_multiple`
+for a more in depth comparison for the models that have been found.
 
 .. code-block:: python
 
@@ -455,24 +466,21 @@ However, the backwards reactions seem to have a large difference.
         'ion': 0.025,
     }, name='Hilgers')
 
-    fig, axs = VSM.plot_grouped_by(
-        model.optimal_x.rename('model'),
+    VM.plot_grouped_by(
+        VM.model.optimal_x.rename('model'),
         rate_constants_Hilgers,
-        group_by=['k-'], file_name='plot_x', xtick_rotation=90)
-    axs[0].set_ylabel('backwards')
-    axs[0].set_yscale('log')
-    axs[1].set_ylabel('forwards')
-    axs[1].set_yscale('log')
-    VSM.save_image(fig, 'plot_x')
+        group_by=['k1_', 'k2_', 'k3_', 'k4_', 'k-2', 'ion'],
+        file_name='plot_x', xtick_rotation=90, show_remaining=False, figsize=(6.4, 8))
 
 .. image:: images/extensive_example/plot_x.png
-    :width: 600
+    :width: 640
     :align: center
 
-The errors of the model can be plotted using the ``plot_grouped_by`` function.
-The total error of the model is 0.196 (model_weighed_errors.sum()), which is approximately 83% of the error found by
+The errors of the model can also be plotted using the ``plot_grouped_by`` function.
+The total error of the model is 0.195 (model_weighed_errors.sum()), which is approximately 83% of the error found by
 Hilgers. However, they did not put the same weights on the these parameters, so it is logical that their fit will be
-different.
+different. See :ref:`visualize_error_curves` for detailed insights into the shapes of the curves, that define these
+errors.
 
 .. code-block:: python
 
@@ -482,27 +490,28 @@ different.
     Hilgers_pred = RCO.create_prediction(rate_constants_Hilgers.values, rate_constants_Hilgers.index.tolist())
     Hilgers_weighed_errors = RCO.weigh_errors(errors=RCO.calculate_errors(Hilgers_pred)).rename('Hilgers')
 
-    fig, axs = VSM.plot_grouped_by(
+    VM.plot_grouped_by(
         model_weighed_errors,
         Hilgers_weighed_errors,
         group_by=['ratio_label', 'ratio_isomer', 'TIC-normal', 'TIC-labeled'], file_name='plot_errors', xtick_rotation=20,
         figsize=(6, 8), sharey='col')
-    VSM.save_image(fig, 'plot_errors')
 
 .. image:: images/extensive_example/plot_errors.png
-    :width: 600
+    :width: 640
     :align: center
 
 The percentage of chemicals which belong to pathway D or E can be plotted as follows:
 
 .. code-block:: python
 
-    VSM.plot_enantiomer_ratio(
+    fig, ax = VM.plot_enantiomer_ratio(
         group_by=['3', '4/5', '6'],
-        ratio_of=['D', 'E'],
+        ratio_of=['D', 'E', 'F'],
         experimental=experimental,
         prediction=model_pred,
         warn_label_assumption=False)
+    ax.set_ylim(0, 1)
+    VM.save_image(fig, 'plot_enantiomer_ratio')
 
 Because both the labeled compound and the non-labeled compound have very similar names, (3D vs 3D'), we know
 that the identifiers given in ``group_by`` and ``ratio_of`` wont be able to seperate these two cases from each other.
@@ -512,94 +521,168 @@ to false. It is fine to plot only the ratios for the non-labeled compounds as th
 identical for the non-labeled and labeled compounds.
 
 .. image:: images/extensive_example/plot_enantiomer_ratio.png
-    :width: 600
+    :width: 640
     :align: center
 
+Heat maps
+~~~~~~~~~
 The changes in the parameters can be plotted over time by using a heatmap as follows:
 
 .. code-block:: python
 
-    VSM.plot_rate_over_time(log_scale=True, x_min=1e-4)
+    VM.plot_rate_over_time(log_scale=True, x_min=1e-4)
 
 .. image:: images/extensive_example/plot_rate_over_time.png
-    :width: 600
+    :width: 640
     :align: center
 
 The sensitivity of the model, for each parameter with respect to a change in its value, can be shown as follows:
 
 .. code-block:: python
 
-    VSM.plot_rate_sensitivity(x_min=1e-6, x_max=100, steps=101, max_error=0.5)
+    VM.plot_rate_sensitivity(x_min=1e-6, x_max=100, steps=101, max_error=0.5)
 
 .. image:: images/extensive_example/plot_rate_sensitivity.png
-    :width: 600
+    :width: 640
     :align: center
 
+.. _visualize_error_curves:
+
+Error curves
+~~~~~~~~~~~~
 We can visualize the curves that are used for the calculation of the error as follows:
 
 .. code-block:: python
 
+    def plot_curves(data, errors=None, **style):
+        """if errors are given, give each line a label including the error for that curve"""
+        plot_label = True if errors is not None else False
+        for i, intermediate in enumerate(INTERMEDIATES):
+            for j, isomer in enumerate(ISOMERS):
+                chemical_iso_split = f"int_{intermediate}_iso_{isomer}"
+                chemical = f"{intermediate}{isomer}"
+
+                # plot label ratio, the curve of the labeled compound is the same, by definition, as 1 - unlabeled
+                label = f"{chemical} MAE: {errors[f'ratio_label_{chemical_iso_split}']:.3f}" if plot_label else None
+                axs_label[j, 0].plot(time, data[f"ratio_label_{chemical_iso_split}"], color=f"C{i}", label=label, **style)
+                axs_label[j, 0].plot(time, 1 - data[f"ratio_label_{chemical_iso_split}"], color="tab:gray", **style)
+
+                # isomer ratio
+                label = f"{chemical} MAE: {errors[f'ratio_isomer_{chemical_iso_split}']:.3f}" if plot_label else None
+                axs_isomer[i, 0].plot(time, data[f"ratio_isomer_{chemical_iso_split}"], color=f"C{j}", label=label, **style)
+
+                # TIC shape
+                label = f"{chemical} MAE: {errors[f'TIC-normal_{chemical_iso_split}']:.3f}" if plot_label else None
+                axs_TIC[j, i].plot(time, data[f"TIC-normal_{chemical_iso_split}"], color="tab:blue", label=label, **style)
+
+                # TIC labeled shape
+                label = f"{chemical}{LABEL} MAE: {errors[f'TIC-labeled_{chemical_iso_split}']:.3f}" if plot_label else None
+                axs_TIC[j, i].plot(time, data[f"TIC-labeled_{chemical_iso_split}"], color="tab:orange", label=label, **style)
+
+    # manual plot of curves
     fig_label, axs_label = plt.subplots(3, 1, tight_layout=True, figsize=(8, 8), squeeze=False)
     axs_label[0, 0].set_title('label ratio')
     fig_isomer, axs_isomer = plt.subplots(2, 1, tight_layout=True, squeeze=False)
     axs_isomer[0, 0].set_title('isomer ratio')
-    fig_TIC, axs_TIC = plt.subplots(3, 2, tight_layout=True, figsize=(8, 8), squeeze=False)
+    fig_TIC, axs_TIC = plt.subplots(3, 2, tight_layout=True, figsize=(12, 8), squeeze=False)
     axs_TIC[0, 0].set_title('TIC shape')
-    marker_settings = {"alpha": 0.4, "marker": ".", "s": 1}
 
-    best_prediction: pd.DataFrame = RCO.create_prediction(model.optimal_x, model.x_description)
+    # experimental
+    plot_curves(VM.RCO.experimental_curves, linestyle='', marker='.', ms=1, alpha=0.4)
 
-    true = RCO.experimental_curves
-    pred = RCO.calculate_curves(best_prediction)
+    # best model
+    pred = VM.RCO.create_prediction(VM.model.optimal_x.values, VM.model.optimal_x.index)
+    curves = VM.RCO.calculate_curves(pred)
+    errors = VM.RCO.weigh_errors(VM.RCO.calculate_errors(pred))
+    plot_curves(curves, errors, linestyle='-')
 
-    errors = RCO.weigh_errors(RCO.calculate_errors(best_prediction))
-
-    for i, intermediate in enumerate(INTERMEDIATES):
-        # sum does not have to be recalculated between the isomer runs
-        sum_all_isomers = best_prediction[[intermediate+isomer for isomer in ISOMERS]].sum(axis=1)
-        for j, isomer in enumerate(ISOMERS):
-            # the "iso_" prefix is given to each chemical so that we can search the strings for e.g. "iso_A" and not get a match for label
-            chemical_iso_split = f"int_{intermediate}_iso_{isomer}"
-            chemical = f"{intermediate}{isomer}"
-
-            # plot label ratio
-            axs_label[j, 0].plot(time, pred[f"ratio_label_{chemical_iso_split}"], color=f"C{i}",
-                label=f"{chemical_iso_split} MAE: {errors[f'ratio_label_{chemical_iso_split}']:.3f}")
-            axs_label[j, 0].scatter(time, true[f"ratio_label_{chemical_iso_split}"], color=f"C{i}", **marker_settings)
-            # the curve of the labeled compound is the same, by definition, as 1 - unlabeled
-            axs_label[j, 0].plot(time, 1-pred[f"ratio_label_{chemical_iso_split}"], color="tab:gray")
-            axs_label[j, 0].scatter(time, 1-true[f"ratio_label_{chemical_iso_split}"], color="tab:gray", **marker_settings)
-
-            # isomer ratio
-            axs_isomer[i, 0].plot(time, pred[f"ratio_isomer_{chemical_iso_split}"],
-                label=f"{chemical} MAE: {errors[f'ratio_isomer_{chemical_iso_split}']:.3f}")
-            axs_isomer[i, 0].scatter(time, RCO.experimental_curves[f"ratio_isomer_{chemical_iso_split}"], **marker_settings)
-
-            # TIC shape
-            axs_TIC[j, i].plot(time, pred[f"TIC-normal_{chemical_iso_split}"], color="tab:blue",
-                               label=f"{chemical} MAE: {errors[f'TIC-normal_{chemical_iso_split}']:.3f}")
-            axs_TIC[j, i].scatter(time, RCO.experimental_curves[f"TIC-normal_{chemical_iso_split}"], color="tab:blue", **marker_settings)
-
-            axs_TIC[j, i].plot(time, pred[f"TIC-labeled_{chemical_iso_split}"], color="tab:gray",
-                label=f"""{chemical}{LABEL} MAE: {errors[f"TIC-labeled_{chemical_iso_split}"]:.3f}""")
-            axs_TIC[j, i].scatter(time, RCO.experimental_curves[f"TIC-labeled_{chemical_iso_split}"], color="tab:gray", **marker_settings)
+    # Hilgers model
+    pred = VM.RCO.create_prediction(rate_constants_Hilgers.values, rate_constants_Hilgers.index)
+    curves = VM.RCO.calculate_curves(pred)
+    errors = VM.RCO.weigh_errors(VM.RCO.calculate_errors(pred))
+    plot_curves(curves, errors, linestyle='--')
 
     for ax in np.concatenate([axs_label.flatten(), axs_isomer.flatten(), axs_TIC.flatten()]):
-        ax.legend()
+        ax.legend(ncol=2)
+    VM.save_image(fig_label, 'label')
+    VM.save_image(fig_isomer, 'isomer')
+    VM.save_image(fig_TIC, 'TIC')
 
-    VSM.save_image(fig_label, 'label')
-    VSM.save_image(fig_isomer, 'isomer')
-    VSM.save_image(fig_TIC, 'TIC')
+The data of Hilgers will be plotted as a dashed line, whereas the found curves will be plotted with a full line.
 
 .. image:: images/extensive_example/label.png
-    :width: 600
+    :width: 640
     :align: center
 
 .. image:: images/extensive_example/isomer.png
-    :width: 600
+    :width: 640
     :align: center
 
 .. image:: images/extensive_example/TIC.png
-    :width: 600
+    :width: 1200
     :align: center
 
+.. _visualize_multiple:
+
+Multiple guesses
+~~~~~~~~~~~~~~~~
+The following plots can be made for multiple optimization processes only.
+
+.. code-block:: python
+
+    VM.plot_error_all_runs()
+    VM.plot_error_all_runs(60, file_name='plot_error_all_runs_zoom_in')
+
+.. image:: images/extensive_example/plot_error_all_runs.png
+    :width: 640
+    :align: center
+
+.. image:: images/extensive_example/plot_error_all_runs_zoom_in.png
+    :width: 640
+    :align: center
+
+.. code-block:: python
+
+    VM.plot_ratio_all_runs(ratio=('6D', ['6D', '6E']), top_n=60)
+
+.. image:: images/extensive_example/plot_ratio_all_runs.png
+    :width: 640
+    :align: center
+
+We can check out the distribution of the rate constants for the best plateau as follows:
+
+.. code-block:: python
+
+    VM.plot_x_all_runs(slice(8), file_name='best')
+
+.. image:: images/extensive_example/best.png
+    :width: 640
+    :align: center
+
+Because there are three main plateaus, and the figure above shows minimal variation within a  plateau (same for the other
+plateaus, not shown here), we can just take a model for each plateau and compare them:
+
+.. code-block:: python
+
+    fig, axs = VM.plot_grouped_by(
+        models.get_model(0).optimal_x.rename('model_0'),
+        rate_constants_Hilgers,
+        models.get_model(8).optimal_x.rename('model_8'),
+        models.get_model(15).optimal_x.rename('model_15'),
+        group_by=['k1_', 'k2_', 'k3_', 'k4_', 'k-2', 'ion'],
+        show_remaining=False, figsize=(6.4, 8), file_name='x_comparison_multiple_models')
+    for ax in axs:
+        ax.set_yscale('log')
+    VM.save_image(fig, 'x_comparison_multiple_models')
+
+.. image:: images/extensive_example/x_comparison_multiple_models.png
+    :width: 640
+    :align: center
+
+.. code-block:: python
+
+    VM.plot_biplot_all_runs(slice(60))
+
+.. image:: images/extensive_example/plot_biplot_all_runs.png
+    :width: 640
+    :align: center
