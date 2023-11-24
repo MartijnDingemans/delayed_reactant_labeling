@@ -20,12 +20,12 @@ image_folder.mkdir()
 #     x_bounds=bounds,
 #     n_runs=10,
 #     n_jobs=-2)
-
 # RCO.optimize(
 #     x0=np.array([1, 1, 1]),
 #     x_description=x_description,
 #     x_bounds=bounds,
 #     path='./complete_optimization/')
+
 models = OptimizedMultipleModels('./complete_multiple_optimization')
 model = models.best  # OptimizedModel('./complete_optimization')
 
@@ -203,7 +203,7 @@ def test_overwriting():
 
 
 def test_plot_path_in_pca(VM_fixture):
-    VM_fixture.plot_path_in_pca(PC1=1, PC2=2, file_name='pca_usecase1')
+    VM_fixture.plot_path_in_pca(pc1=1, pc2=2, file_name='pca_usecase1')
 
 
 def test_missing_parameters():
