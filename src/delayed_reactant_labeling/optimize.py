@@ -128,24 +128,28 @@ class OptimizedModel:
 
 class OptimizedMultipleModels:
     """Formatted data structure for multiple optimized models.
+    The data will be formatted such that the best run starts at index 0,
+    and the error ascends with each index number.
 
-        Parameters
-        ----------
-        path
-            The path to the directory, which contains subdirectories.
-            Each subdirectory in turn should contain the optimization progress corresponding to its model number.
+    Parameters
+    ----------
+    path
+        The path to the directory, which contains subdirectories.
+        Each subdirectory in turn should contain its optimization progress.
 
-        Attributes
-        ----------
-        x_description : list[str]
-            The description of each parameter.
-        all_initial_x :pd.Series
-            The initial parameters, x, in each model.
-        all_optimal_x : pd.Series
-            The optimal parameters, x, in each model.
-        all_optimal_error : float
-            The error when using the optimal parameters in each model.
-        """
+    Attributes
+    ----------
+    x_description : list[str]
+        The description of each parameter.
+    all_initial_x : pd.DataFrame
+        The initial parameters, x, in each model.
+    all_optimal_x : pd.DataFrame
+        The optimal parameters, x, in each model.
+    all_optimal_error : np.ndarray
+        The error when using the optimal parameters in each model.
+    best : OptimizedModel
+        The model with the lowest error.
+    """
     def __init__(self, path: str | pathlib.Path):
         if not isinstance(path, pathlib.Path):
             path = pathlib.Path(path)
@@ -177,23 +181,25 @@ class OptimizedMultipleModels:
             if self.x_description is None:
                 self.x_description = model.x_description
 
-        self.all_initial_x = pd.DataFrame(initial_x, index=index, columns=self.x_description)
-        self.all_optimal_x = pd.DataFrame(optimal_x, index=index, columns=self.x_description)
-        self.all_optimal_error = np.array(found_error)
+        found_error = np.array(found_error)
+        best_model_index = np.argsort(found_error)
 
-        # store information on the best model
-        best_model_index = np.argsort(self.all_optimal_error)
-        self.best = self.get_model(best_model_index[0])
+        self.all_initial_x: pd.DataFrame = pd.DataFrame(initial_x, index=index, columns=self.x_description).iloc[best_model_index, :]
+        self.all_optimal_x: pd.DataFrame = pd.DataFrame(optimal_x, index=index, columns=self.x_description).iloc[best_model_index, :]
+        self.all_optimal_error: np.ndarray = found_error[best_model_index]
+
+        self._best_model_index = best_model_index
+        self.best = self.get_model(0)
 
     def get_model(self, n: int) -> OptimizedModel:
-        """Returns the n-th model.
+        """Returns the n-th model, when sorted by the error (the best model at index 0).
 
         Args
         ----
         n
             The index of the model that is to be retrieved.
         """
-        return OptimizedModel(path=self._model_paths[n])
+        return OptimizedModel(path=self._model_paths[self._best_model_index[n]])
 
 
 class RateConstantOptimizerTemplate(ABC):
@@ -524,7 +530,7 @@ class RateConstantOptimizerTemplate(ABC):
             start_seed = 0
         except FileExistsError:
             start_seed = len(os.listdir(path))
-            warnings.warn("Cannot create a directory when that directory already exists. "
+            warnings.warn(f"Cannot create a directory ({path}) when that directory already exists. "
                           f"Appending results instead starting with seed {start_seed}")
 
         if x0_bounds is None:
