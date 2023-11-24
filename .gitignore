@@ -7,5 +7,4 @@ pyproject.toml
 /docs/build/
 /dist/
 **/*optimization*/**
-/max/
 **/*model_boundaries*/*.xlsx
