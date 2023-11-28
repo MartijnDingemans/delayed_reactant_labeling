@@ -1,7 +1,5 @@
 Implementation details
 ======================
-For both the predict and optimize modules it was essential to make the code as efficient as possible, while remaining
-robust.
 
 .. _rate_equations:
 
@@ -60,6 +58,6 @@ The explicit Euler formula takes the rate of changes as calculated above, and ad
 It repeats this the number of ``steps_per_step`` times, and discards the intermediate results. The last
 array of predicted concentration is saved at the corresponding time stamp.
 
-This method does not work well in stiff problems and using an ODE solver is recommended.
+This method does not work well in stiff problems, and using an ODE solver is recommended.
 
 

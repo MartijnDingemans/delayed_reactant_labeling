@@ -37,7 +37,7 @@ friendly way:
 
 Where the first element of each tuple is the name of the corresponding rate constant, the second element is a list
 containing all reactants, and the third element is a list containing all the products. If for example B split into C and
-byproduct D, we could write the reaction2 as ``reaction2 = ('k2', ['B'], ['C', 'D'])``
+byproduct D, we could write reaction2 as ``reaction2 = ('k2', ['B'], ['C', 'D'])``
 
 Lets assume that we know the rate constants belonging to this reaction.
 
@@ -49,7 +49,7 @@ Lets assume that we know the rate constants belonging to this reaction.
     }
 
 We can create a prediction using the :func:`DRL.predict_concentration`. The class implements the method which determines
-the rate of change as a function of its current state, and a method which calculate the Jacobian based on its state.
+the rate of change as a function of its current state, and a method which calculates the Jacobian based on its state.
 Because we do not want to model an entire DRL experiment, ``solve_ivp`` is used instead of :func:`DRL.predict_concentration`.
 Internally, this function also calls ``solve_ivp``.
 
@@ -111,9 +111,9 @@ We can compare the algebraic solution to the modelled prediction as follows.
     :width: 600
     :align: center
 
-It is clear that the model fits the data very well, and its much easier to implement these few lines of code, instead of
+It is clear that the model fits the data very well. Besides, it's much easier to implement these few lines of code, instead of
 doing the mathematics. Furthermore, implementing more difficult problems only requires the addition of a few lines here,
-whereas solving the problem in an exact manner becomes impossible.
+whereas solving the problem in an exact manner might become impossible.
 
 This current system can also be converted to a DRL experiment by adding a labeled reactant A at a certain timestamp.
 This labeled reactant reacts in a identical manner to A, except that the corresponding products are also labeled.

@@ -489,9 +489,9 @@ class VisualizeModel:
             norm = Normalize(vmin=x_min, vmax=x_max)
 
         fig, ax = plt.subplots(**fig_kwargs)
-        im = ax.imshow(self.model.all_x.loc[:, ~self.hide_params].T, aspect='auto', label='intensity', norm=norm)
+        im = ax.pcolormesh(self.model.all_x.loc[:, ~self.hide_params].T, label='intensity', norm=norm)
         fig.colorbar(im, label='intensity')
-        ax.set_yticks(np.arange(sum(~self.hide_params)))
+        ax.set_yticks(np.arange(sum(~self.hide_params)) + 0.5)
         ax.set_yticklabels(self.model.x_description[~self.hide_params].tolist())
         ax.set_xlabel('iteration')
         self.save_image(fig, file_name)

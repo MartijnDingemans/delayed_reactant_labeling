@@ -383,7 +383,7 @@ class RateConstantOptimizerTemplate(ABC):
         Args
         ----
         x0
-            Parameters which are to be optimized. Always contain the rate constants.
+            Parameters which are to be optimized. Always contains the rate constants.
         x_description
             Description of each parameter.
         x_bounds
@@ -490,9 +490,11 @@ class RateConstantOptimizerTemplate(ABC):
                           **optimize_kwargs) -> None:
         """Optimizes the system, utilizing a nelder-mead algorithm, for a given number of runs.
         Each run has random starting positions for each parameter, which is distributed according to a loguniform
-        distribution. The bounds of the starting position (x0_bounds) can be separately controlled from the bounds the
-        system is allowed to explore (x_bounds). If the given path already has an existing directory called
-        'optimization_multiple_guess', the optimization will be resumed from that point onwards.
+        distribution. This choice of distribution allows the model to sample each parameter equally a logarithmic scale,
+        for example k1 will be sampled just as often between 10e-5 and 10e-4 as between 0.1 and 1, allowing a wide
+        range of values to be examined. The bounds of the starting position (x0_bounds) can be separately controlled
+        from the bounds the system is allowed to explore (x_bounds). If the given path already has an existing directory
+        called 'optimization_multiple_guess', the optimization will be resumed from that point onwards.
 
         Args
         ----
@@ -511,7 +513,8 @@ class RateConstantOptimizerTemplate(ABC):
         x0_min
             The minimum value the lower bound of x0_bounds can take. Any values lower than it is set to x0_min.
         n_jobs
-            The number of processes which should be used, if -1, all available cores are used.
+            The number of processes which should be used, allowing negative indexing, i.e. n_jobs=-1 would use up all
+            available cores, n_jobs=-2 would use all available cores except one, etc.
         backend
             The backend that is used by Joblib. Loky (default) works on all platforms.
         **optimize_kwargs

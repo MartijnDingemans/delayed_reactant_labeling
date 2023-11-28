@@ -15,9 +15,9 @@ There are 3 isomers per intermediate in this reaction:
     :align: center
 
 Below I will describe how we can analyze their data using the delayed_reactant_labeling module. However, to make the
-analysis easier we have changed the naming convention. The major pathway 3C -> 4B -> 5B -> R6 and minor pathway
-3B -> 4C -> 5C -> S6 is quite confusing as the label of the isomer changes for the same pathway. Therefore all chemicals
-in the major pathway have been labeled with "D", and in the minor pathway with "E". All chemical in the side pathway
+analysis easier we have changed the naming convention. The major pathway ``3C -> 4B -> 5B -> R6``and minor pathway
+``3B -> 4C -> 5C -> S6`` is quite confusing as the label of the isomer changes for the same pathway. Therefore all intermediates
+in the major pathway have been labeled with "D", and in the minor pathway with "E". All intermediates in the side pathway
 "A" have been labeled "F". The data adjusted for this naming convention, and with time array extending for the
 data pre-addition of the labeled compound can be found on `github <https://github.com/MartijnDingemans/delayed_reactant_labeling/tree/5a06b113895e3c8b324220486a59d7510bd77bf1/examples>`_.
 
@@ -61,9 +61,9 @@ First we import the required modules, and show the original data around the time
     :width: 600
     :align: center
 
-We can clearly see that around 10.15 minutes the intensity of 3D increases rapidly. Therefore, this seems like a good
-t0. Furthermore we see that many of the labeled compounds (dashed lines) have intensities before the chemicals should
-be present. We can correct our data according for these two factors as follows:
+We can clearly see that around 10.15 minutes the intensity of 3D' increases rapidly. Therefore, we can assume this to
+be t0. Furthermore we see that the labeled compounds (dashed lines) have intensities before the chemicals should
+be present due to inherent noise. We can correct our data according for these two factors as follows:
 
 .. code-block:: python
 
@@ -93,9 +93,9 @@ be present. We can correct our data according for these two factors as follows:
 Defining the error metric
 -------------------------
 
-For the typical DRL experiment, the focus is on the initial part of the curve, as this is where the largest changes occur.
+For a typical DRL experiment, the initial part of the curve is the most important, as this is where the largest changes occur.
 When we optimize the model, we can weigh these initial parts more heavily than others.
-Below a function, or combination of functions, can be given which will construct the weight of each datapoint.
+Below a function, or combination of functions, can be given which will construct the relative weight given to each datapoint.
 Furthermore, the type of error (MAE, MAPE, RMSE) can be defined here.
 
 .. code-block:: python
@@ -157,8 +157,8 @@ is given by:
 
     [3]_t = [3]_{eq} \cdot (1 - e^{-(k_{-1} + k_2) \cdot t})
 
-Hilgers et al. performed kinetic experiments that showed that :math:`k_{-1}` equals 0, and therefore we can straight
-up extract :math:`k_2` from :eq:`3t`. In code this is done as follows:
+Hilgers et al. performed kinetic experiments that showed that :math:`k_{-1}` equals 0, and therefore we can
+straightforwardly extract :math:`k_2` from :eq:`3t`. In code this is done as follows:
 
 .. code-block:: python
 
@@ -205,9 +205,9 @@ up extract :math:`k_2` from :eq:`3t`. In code this is done as follows:
     :width: 600
     :align: center
 
-Similar graphs were made for E and F, although the noise in F specifically allowed for a large range of values in which
-the rate constant yielded an acceptable error. The found range where the error was 110% for 3E was [0.675 - 0.934],
-and for 3F [0.242 - 1.228].
+Similar graphs were made for isomers E and F, although the larger amount of noise in F allowed for a large range of values in which
+the rate constant yielded an acceptable error. The found range where the error increased up to 10% compared to its minimum error
+for 3E was [0.675 - 0.934], and for 3F [0.242 - 1.228].
 
 Defining the model
 ------------------
@@ -240,7 +240,7 @@ its backwards reaction.
 
     reactions = deepcopy(REACTIONS_ONEWAY)
     for k, reactants, products in REACTIONS_ONEWAY:
-        reactions.append(("k-" + k[1:], products, reactants))
+        reactions.append(("k-" + k[1:], products, reactants))  # 'kABC' reactants, products -> 'k-ABC', products, reactants
     rate_constant_names = sorted(set([k for k, _, _ in reactions]))
 
     # these groups will make the analysis easier
@@ -253,14 +253,16 @@ The next step is to the create our RateConstantOptimizer class. We will apply th
 2. isomer ratio: The ratio of e.g. 3D / (3D + 3E + 3F).
 3. TIC shape: how well the curve represent the shape of the TIC curve.
 
-It is important to note that we should not fit on the TIC if we have normalized the data with respect to it. If we
-consider the system A -> B, where the ionization efficiency are 1 for A, 2 for B respectively, we can see that the
-total TIC will increase over time. By normalizing with respect to the TIC we remove this information from the data.
+.. warning::
+
+    It is important to note that we should not fit on the TIC if we have normalized the data with respect to it. If we
+    consider the system A -> B, where the ionization efficiency are 1 for A, 2 for B respectively, we can see that the
+    total TIC will increase over time. By normalizing with respect to the TIC we remove this information from the data.
 
 We will apply weights to each type of error to make sure that the system prioritizes getting the label ratio right, but
-would see it as a benefit if the isomer ratio also fits well. In the optimized model the three different kinds of error
-are relatively similar to each other in the contribution to the total error. The weight of all isomers F has been
-drastically decreased because of the large amount of noise in this data.
+would see it as a benefit if the isomer ratio also fits well. We will see later that in the optimized model, the three
+different kinds kinds of error contribute in roughly equal amount to the total error. The weight of all isomers F has been
+decreased to account for the larger amount of noise in this data.
 
 .. code-block:: python
 
@@ -347,13 +349,15 @@ drastically decreased because of the large amount of noise in this data.
 
 Optimizing the model
 --------------------
-To optimize the model we need to first define the bounds and starting position of the system.
+To optimize the model we need to first define the bounds and starting position of the system. To conveniently manipulate
+the bounds and x0 of each parameter, we construct a DataFrame. In this DataFrame each row belongs to a different
+parameter, and the columns describe x0, lower boundary, and upper boundary.
 
 .. code-block:: python
 
     dimension_descriptions = list(rate_constant_names) + ["ion"]
     constraints = pd.DataFrame(np.full((len(dimension_descriptions), 3), np.nan),
-                               columns=["vertex", "lower", "upper"],
+                               columns=["x0", "lower", "upper"],
                                index=dimension_descriptions)
 
     index_reverse_reaction = constraints.index.str.contains("k-")
@@ -373,7 +377,7 @@ To optimize the model we need to first define the bounds and starting position o
     constraints.iloc[np.nonzero(constraints.index.str.contains("k-1"))] = [0, 0, 0]
     constraints.iloc[np.nonzero(constraints.index.str.contains("k-3"))] = [0, 0, 0]
     constraints.iloc[np.nonzero(constraints.index.str.contains("k-4"))] = [0, 0, 0]
-    vertex = constraints["vertex"].to_numpy()
+    x0 = constraints["x0"].to_numpy()
     bounds = Bounds(constraints['lower'].to_numpy(), constraints['upper'].to_numpy())
 
 We can optimize the system once like this:
@@ -382,7 +386,7 @@ We can optimize the system once like this:
 
     path = './optimization/'
     RCO.optimize(
-        x0=vertex,
+        x0=x0,
         x_description=dimension_descriptions,
         x_bounds=bounds,
         path=path,
@@ -440,7 +444,7 @@ The figsize keyword is supplied to ensure that the figure is square.
 
 .. code-block:: python
 
-    VM.plot_path_in_pca(PC1=0, PC2=1, figsize=(6.4, 6.4))
+    VM.plot_path_in_pca(pc1=0, pc2=1, figsize=(6.4, 6.4))
 
 .. image:: images/extensive_example/plot_path_in_pca.png
     :width: 640
@@ -484,7 +488,7 @@ errors.
 
 .. code-block:: python
 
-    model_pred = RCO.create_prediction(model.optimal_x.values, model.optimal_x.index.tolist())
+    model_pred = RCO.create_prediction(VM.model.optimal_x.values, VM.model.optimal_x.index.tolist())
     model_weighed_errors = RCO.weigh_errors(errors=RCO.calculate_errors(model_pred)).rename('model')
 
     Hilgers_pred = RCO.create_prediction(rate_constants_Hilgers.values, rate_constants_Hilgers.index.tolist())
@@ -516,8 +520,8 @@ The percentage of chemicals which belong to pathway D or E can be plotted as fol
 Because both the labeled compound and the non-labeled compound have very similar names, (3D vs 3D'), we know
 that the identifiers given in ``group_by`` and ``ratio_of`` wont be able to seperate these two cases from each other.
 However, the shortest name will be used in the calculation as this is most likely the non-labeled compound.
-The corresponding warning which is emitted, we can therefore safely ignore by setting the flag ``warn_label_assumption``,
-to false. It is fine to plot only the ratios for the non-labeled compounds as the ratio between isomers should be
+The corresponding warning which is emitted can be ignored by setting the flag ``warn_label_assumption``,
+to False. It is fine to plot only the ratios for the non-labeled compounds as the ratio between isomers should be
 identical for the non-labeled and labeled compounds.
 
 .. image:: images/extensive_example/plot_enantiomer_ratio.png

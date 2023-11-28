@@ -106,7 +106,7 @@ def _calculate_jac(concentrations: np.ndarray,
 
 
 class DRL:
-    """Analyzes a chemical system to be able to predict its concentrations over time.
+    """Contains all information required to predict a chemical system’s concentrations over time.
 
     Parameters
     ----------
@@ -193,14 +193,14 @@ class DRL:
         Args
         ----
         t_eval_pre
-            The time steps, before the addition of the labeled compound.
+            The time steps before the addition of the labeled compound.
             The first element will be the starting time, and the last the time when it ends.
             It can be a 2-cell array.
         t_eval_post
-            The time steps, after the addition of the labeled compound, that must be evaluated.
+            The time steps after the addition of the labeled compound, that must be evaluated.
         initial_concentrations
             The initial concentrations of each chemical.
-            Non-zero concentrations are not required.
+            Only non-zero concentrations are required.
         labeled_concentration
             The concentration of the labeled chemical.
             This concentration is not diluted.
@@ -302,12 +302,12 @@ class DRL:
         Args
         ----
         t_eval_pre
-            The time steps, that must be evaluated, before the addition of the labeled compound.
+            The time steps that must be evaluated, before the addition of the labeled compound.
         t_eval_post
-            The time steps, that must be evaluated and returned, after the addition of the labeled compound.
+            The time steps that must be evaluated and returned, after the addition of the labeled compound.
         initial_concentrations
             The initial concentrations of each chemical.
-            Non-zero concentrations are not required.
+            Only non-zero concentrations are required.
         labeled_concentration
             The concentration of the labeled chemical.
             This concentration is not diluted.
