@@ -85,7 +85,7 @@ for this specific chemical problem exist.
     [B]_t = \frac{k_1}{k_2-k_1}[A]_0(e^{-k_1t}-e^{-k_2t})
     \end{eqnarray}
     \begin{eqnarray}
-    [C]_t = A_0[1-e^{-k_1t}-\frac{k_1}{k_2-k_1}(e^{-k_1t}-e^{-k_2t})]
+    [C]_t = [A]_0[1-e^{-k_1t}-\frac{k_1}{k_2-k_1}(e^{-k_1t}-e^{-k_2t})]
     \end{eqnarray}
 
 We can compare the algebraic solution to the modelled prediction as follows.

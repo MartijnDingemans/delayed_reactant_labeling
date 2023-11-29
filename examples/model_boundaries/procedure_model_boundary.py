@@ -16,8 +16,7 @@ import pandas as pd
 
 from scipy.optimize import Bounds
 from delayed_reactant_labeling.predict import DRL
-from delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate
-from delayed_reactant_labeling.visualize import VisualizeMultipleSolutions
+from delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate, OptimizedMultipleModels
 
 
 def analyze_model_boundary(use_noise, use_tic, optimize=False):
@@ -89,8 +88,8 @@ def analyze_model_boundary(use_noise, use_tic, optimize=False):
 
     def noisify(rng: np.random.Generator, arr: np.ndarray) -> np.ndarray:
         if use_noise:
-            noise_dynamic = rng.normal(loc=1, scale=0.1, size=arr.shape)  # fraction error
-            noise_static = rng.normal(loc=0.015, scale=0.0075, size=arr.shape)
+            noise_dynamic = rng.normal(loc=1, scale=0.02, size=arr.shape)  # fraction error
+            noise_static = rng.normal(loc=0, scale=0.001, size=arr.shape)
             return arr * noise_dynamic + noise_static
         else:
             return arr
@@ -135,7 +134,7 @@ def analyze_model_boundary(use_noise, use_tic, optimize=False):
         rng = np.random.default_rng(42)
         for col in real_data.columns[:-1]:  # last column contains time array
             fake_col = noise_func(rng, real_data[col].values)
-            fake_col[fake_col < 1e-10] = 1e-10  # no negative intensity
+            fake_col[fake_col < 1e-15] = 1e-15  # no negative intensity
             fake_data.append(fake_col)
             ax.scatter(real_data['time'], fake_col, label=col, marker='.')
 
@@ -153,45 +152,42 @@ def analyze_model_boundary(use_noise, use_tic, optimize=False):
         x_bounds = Bounds(np.array([1e-9, 0, 1e-9]), np.array([100, 100, 100]))  # lower, upper
 
         if optimize:
-            RCO.optimize_multiple(path=f'{path}/multiple_guess/', n_runs=1000, x_bounds=x_bounds,
+            RCO.optimize_multiple(path=f'{path}/multiple_guess/', n_runs=100, x_bounds=x_bounds,
                                   x_description=dimension_description, n_jobs=-1,
                                   metadata={"USE_NOISE": use_noise, "USE_TIC": use_tic})
-            to_zip(path)  # individual files take up at least 1 Mb at the server, -> zipping reduces size load drastically.
-            return None
-        else:
-            # analysis of the data
-            with zipfile.ZipFile(f'optimization/optimization_model_boundaries/{path}.zip', mode="r") as archive:
-                archive.extractall(path=f'optimization/{path}')
-            VMS = VisualizeMultipleSolutions(f'optimization/{path}/multiple_guess/')
-            shutil.rmtree(f'optimization/{path}')
+            to_zip(path)  # individual files take up at least 1 Mb at the server, -> zipping reduces the size load drastically.
 
-            # using the "real" values
-            pred = RCO.create_prediction(x=[k1, kr1, k2], x_description=dimension_description)
-            errors = RCO.calculate_errors(pred)
-            total_error_real = RCO.calculate_total_error(errors)
+        # analysis of the data
+        with zipfile.ZipFile(f'optimization/{path}.zip', mode="r") as archive:
+            archive.extractall(path=f'optimization/{path}')
+        MM = OptimizedMultipleModels(f'optimization/{path}/multiple_guess/')
+        shutil.rmtree(f'optimization/{path}')
 
-            # using best found values
-            sorted_index = VMS.complete_found_error.argsort()
-            best_run = sorted_index[0]
-            best_X = pd.Series(VMS.complete_optimal_X[best_run], index=VMS.x_description)
+        # using the "real" values
+        pred = RCO.create_prediction(x=[k1, kr1, k2], x_description=dimension_description)
+        errors = RCO.calculate_errors(pred)
+        total_error_real = RCO.calculate_total_error(errors)
 
-            out = pd.Series({
-                "k1": k1,
-                "kr1": kr1,
-                "k2": k2,
-                "A_td": fake_data.loc[40:60, "A"].mean(),
-                "B_td": fake_data.loc[40:60, "B"].mean(),
-                "C_td": fake_data.loc[40:60, "C"].mean(),
-                "real_error": total_error_real,
-                "best_error": VMS.complete_found_error[best_run],
-                "best_k1": best_X["k1"],
-                "best_kr1": best_X["k-1"],
-                "best_k2": best_X["k2"],
-                "k1_ratio": best_X["k1"] / k1,
-                "kr1_ratio": best_X["k-1"] / kr1,
-                "k2_ratio": best_X["k2"] / k2,
-            })
-            return out
+        # using best found values
+        best_x = pd.Series(MM.best.optimal_x, index=MM.x_description)
+
+        out = pd.Series({
+            "k1": k1,
+            "kr1": kr1,
+            "k2": k2,
+            "A_td": fake_data.loc[40:60, "A"].mean(),
+            "B_td": fake_data.loc[40:60, "B"].mean(),
+            "C_td": fake_data.loc[40:60, "C"].mean(),
+            "real_error": total_error_real,
+            "best_error": MM.best.optimal_error,
+            "best_k1": best_x["k1"],
+            "best_kr1": best_x["k-1"],
+            "best_k2": best_x["k2"],
+            "k1_ratio": best_x["k1"] / k1,
+            "kr1_ratio": best_x["k-1"] / kr1,
+            "k2_ratio": best_x["k2"] / k2,
+        })
+        return out
 
     data = []
     rate_values = [0.01, 0.1, 1, 5]
@@ -203,7 +199,7 @@ def analyze_model_boundary(use_noise, use_tic, optimize=False):
                 except Exception as e:
                     logging.error(e, exc_info=True)
     df = pd.DataFrame(data)
-    df.to_excel(f"bounds_n_{use_noise}_t_{use_tic}_TIC_0.1.xlsx")
+    df.to_excel(f"bounds_n_{use_noise}_t_{use_tic}_TIC_0.02.xlsx")
 
 
 if __name__ == "__main__":
