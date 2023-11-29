@@ -213,8 +213,9 @@ Defining the model
 ------------------
 
 The chemical system can be described by the following reaction steps. The chemicals that have a labeled counterpart
-are marked with {label} such that we do not have to write it out twice. We than loop over each reaction and create
-its backwards reaction.
+are marked with {label} such that we do not have to write it out twice. We only define the forwards reactions, and
+afterwards loop over each reaction to create its backwards reaction by reversing the ``reactants`` and ``products``,
+and inserting a ``-`` into the name of the rate constant..
 
 .. code-block:: python
 
