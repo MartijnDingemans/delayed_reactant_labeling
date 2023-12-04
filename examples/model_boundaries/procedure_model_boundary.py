@@ -20,7 +20,7 @@ from delayed_reactant_labeling.optimize import RateConstantOptimizerTemplate, Op
 
 
 def analyze_model_boundary(use_noise, use_tic, optimize=False):
-    path_settings = pathlib.Path(f'./n_{use_noise}_t_{use_tic}_TIC_0.1/')
+    path_settings = pathlib.Path(f'./optimization/n_{use_noise}_t_{use_tic}_TIC_0.1/')
     path_settings.mkdir(exist_ok=True)
 
     logging.basicConfig(
@@ -158,10 +158,10 @@ def analyze_model_boundary(use_noise, use_tic, optimize=False):
             to_zip(path)  # individual files take up at least 1 Mb at the server, -> zipping reduces the size load drastically.
 
         # analysis of the data
-        with zipfile.ZipFile(f'optimization/{path}.zip', mode="r") as archive:
-            archive.extractall(path=f'optimization/{path}')
-        MM = OptimizedMultipleModels(f'optimization/{path}/multiple_guess/')
-        shutil.rmtree(f'optimization/{path}')
+        with zipfile.ZipFile(f'{path}.zip', mode="r") as archive:
+            archive.extractall(path=f'{path}')
+        MM = OptimizedMultipleModels(f'{path}/multiple_guess/')
+        shutil.rmtree(f'{path}')
 
         # using the "real" values
         pred = RCO.create_prediction(x=[k1, kr1, k2], x_description=dimension_description)
