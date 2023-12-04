@@ -15,7 +15,7 @@ There are 3 isomers per intermediate in this reaction:
     :align: center
 
 Below I will describe how we can analyze their data using the delayed_reactant_labeling module. However, to make the
-analysis easier we have changed the naming convention. The major pathway ``3C -> 4B -> 5B -> R6``and minor pathway
+analysis easier we have changed the naming convention. The major pathway ``3C -> 4B -> 5B -> R6`` and minor pathway
 ``3B -> 4C -> 5C -> S6`` is quite confusing as the label of the isomer changes for the same pathway. Therefore all intermediates
 in the major pathway have been labeled with "D", and in the minor pathway with "E". All intermediates in the side pathway
 "A" have been labeled "F". The data adjusted for this naming convention, and with time array extending for the
@@ -179,8 +179,11 @@ straightforwardly extract :math:`k_2` from :eq:`3t`. In code this is done as fol
         ax = axs[0]
         ax.set_title(chemical)
         ax.plot(time, f(result.x[0]), label=f'MAE: {result.fun:.4f}', color='tab:orange')
-        ax.scatter(time[:-EQUILIBRIUM_LAST_N], y_true_curve[:-EQUILIBRIUM_LAST_N],s=1, marker='.', color='tab:blue', label='DRL')
-        ax.scatter(time[-EQUILIBRIUM_LAST_N:], y_true_curve[-EQUILIBRIUM_LAST_N:],s=1, marker='.', color='tab:green', label='DRL-eq')
+        ax.scatter(time[:-EQUILIBRIUM_LAST_N], y_true_curve[:-EQUILIBRIUM_LAST_N],s=1, marker='.', color='tab:blue')
+        ax.scatter(time[-EQUILIBRIUM_LAST_N:], y_true_curve[-EQUILIBRIUM_LAST_N:],s=1, marker='.', color='tab:green')
+        ax.scatter(np.nan, np.nan, marker='o', color='tab:blue', label='DRL')  # clearer legend
+        ax.scatter(np.nan, np.nan, marker='o', color='tab:green', label='DRL-eq')
+
         ax.set_xlabel('time (min)')
         ax.set_ylabel('intensity (a.u.)')
         ax.legend()
@@ -194,7 +197,7 @@ straightforwardly extract :math:`k_2` from :eq:`3t`. In code this is done as fol
         ax.scatter(result.x[0], result.fun, label=f'best fit, k: {result.x[0]:.6f}', marker='*', color='tab:orange')
         bounds_10pc = np.where(errors<1.1*result.fun)[0][[0, -1]]
         ax.scatter(rates[bounds_10pc], errors[bounds_10pc], marker='|', color='tab:orange', s=100,
-                   label=f'110% error:\n[{rates[bounds_10pc[0]]:.4f} - {rates[bounds_10pc[1]]:.4f}]')
+                   label=f'+10% MAE:\n[{rates[bounds_10pc[0]]:.4f} - {rates[bounds_10pc[1]]:.4f}]')
         ax.set_xlabel('value of rate constant')
         ax.set_ylabel('MAE')
         ax.legend()
