@@ -345,7 +345,7 @@ class RateConstantOptimizerTemplate(ABC):
             weights = np.ones(errors.shape)
             for description, weight in self.raw_weights.items():
                 index = errors.index.str.contains(description)
-                if len(index) == 0:
+                if index.sum() == 0:  # boolean array
                     raise ValueError(f"no matches were found for {description}")
                 weights[index] = weights[index] * weight
             self.weights = weights

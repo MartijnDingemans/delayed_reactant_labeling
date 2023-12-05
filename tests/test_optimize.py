@@ -117,6 +117,12 @@ def test_weights():
     assert weighted_errors['ratio_A'] == approx(errors['ratio_A'] * 0.69)
     assert weighted_errors['ratio_B'] == errors['ratio_B']
 
+    with pytest.raises(ValueError):
+        RCO_weighted = RateConstantOptimizer(experimental=fake_data, metric=metric, raw_weights={'faulty_weight': 0.69})
+        pred = RCO_weighted.create_prediction(np.array([1, 1, 1]), x_description=x_description)
+        errors = RCO_weighted.calculate_errors(pred)
+        weighted_errors = RCO_weighted.weigh_errors(errors)  # should throw an error here.
+
 
 def test_throws_error_upon_nan_error():
     fake_data_faulty = fake_data.copy()
