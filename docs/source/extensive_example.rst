@@ -339,7 +339,7 @@ decreased to account for the larger amount of noise in this data.
             weighed_errors = super().weigh_errors(errors)
 
             # perform the usual behavior of this function, but also perform an additional check with regards to the output!
-            TIC_sum = weighed_errors[weighed_errors.index.str.contains("TIC_")].sum()
+            TIC_sum = weighed_errors[weighed_errors.index.str.contains("TIC-")].sum()
             label_sum = weighed_errors[weighed_errors.index.str.contains("label_")].sum()
             isomer_sum = weighed_errors[weighed_errors.index.str.contains("isomer_")].sum()
             total = TIC_sum + label_sum + isomer_sum
