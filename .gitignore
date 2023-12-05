@@ -8,3 +8,4 @@ pyproject.toml
 /dist/
 **/*optimization*/**
 **/*model_boundaries*/*.xlsx
+/examples/docs/images/
