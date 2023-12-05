@@ -259,9 +259,9 @@ The next step is to the create our RateConstantOptimizer class. We will apply th
 
 .. warning::
 
-    It is important to note that we should not fit on the TIC if we have normalized the data with respect to it. If we
-    consider the system A -> B, where the ionization efficiency are 1 for A, 2 for B respectively, we can see that the
-    total TIC will increase over time. By normalizing with respect to the TIC we remove this information from the data.
+    It is important to note that we should not fit on the TIC if the data has been normalized with respect to the TIC,
+    because in that case the intensity of a chemical is not necessarily proporional to the concentration.
+    This is only a concern when the TIC changes over time.
 
 We will apply weights to each type of error to make sure that the system prioritizes getting the label ratio right, but
 would see it as a benefit if the isomer ratio also fits well. We will see later that in the optimized model, the three
