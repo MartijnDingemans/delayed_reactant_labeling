@@ -9,3 +9,4 @@ pyproject.toml
 **/*optimization*/**
 **/*model_boundaries*/*.xlsx
 /examples/docs/images/
+/examples/report/
