@@ -191,7 +191,7 @@ def optimize(compounds: list[str], calculate=True, noise_level=NOISE_LEVEL, stat
             weighed_errors = super().weigh_errors(errors)
 
             # perform the usual behavior of this function, but also perform an additional check with regards to the output!
-            TIC_sum = weighed_errors[weighed_errors.index.str.contains("TIC_")].sum()
+            TIC_sum = weighed_errors[weighed_errors.index.str.contains("TIC-")].sum()
             label_sum = weighed_errors[weighed_errors.index.str.contains("label_")].sum()
             isomer_sum = weighed_errors[weighed_errors.index.str.contains("isomer_")].sum()
             total = TIC_sum + label_sum + isomer_sum
@@ -248,9 +248,6 @@ def optimize(compounds: list[str], calculate=True, noise_level=NOISE_LEVEL, stat
 
         # normalize w.r.t. TIC
         fake_data = pd.DataFrame(fake_data, index=fake_data_columns).T
-        # TODO discuss effect of normalizing the TIC; this seems to show that if TIC is normalized we can no longer
-        # TODO use it for the model.
-        # TODO fake_data = fake_data.divide(fake_data.sum(axis=1), axis=0)
         fake_data['time (min)'] = real_data['time']
         fig, axs = plot_data(fake_data)
         fig.suptitle('concentrations -> ionization factors')

@@ -322,9 +322,10 @@ class VisualizeModel:
 
         ax = fig.add_subplot(gs[0, 1])
         scaler = StandardScaler()
-        pca = PCA().fit(X=scaler.fit_transform(self.model.all_x))
-        scattered = ax.scatter(self.model.all_x.dot(pca.components_[pc1]),
-                               self.model.all_x.dot(pca.components_[pc2]),
+        pca = PCA()
+        X_reduced = pca.fit_transform(X=scaler.fit_transform(self.model.all_x))
+        scattered = ax.scatter(X_reduced[:, pc1],
+                               X_reduced[:, pc2],
                                c=np.arange(len(self.model.all_x)))
         ax.tick_params(bottom=False, left=False, labelbottom=False, labelleft=False)
         ax_bbox = ax.get_position(original=True)
@@ -727,19 +728,20 @@ class VisualizeModel:
         data = np.concatenate([data_initial, data_optimal], axis=0)
 
         scaler = StandardScaler()
-        pca = PCA().fit(X=scaler.fit_transform(data))
+        pca = PCA()
+        pca.fit(X=scaler.fit_transform(data))
 
         fig, ax = plt.subplots(**fig_kwargs)
 
         # scores
         im = ax.scatter(
-            scaler.transform(data_initial).dot(pca.components_[pc1]),
-            scaler.transform(data_initial).dot(pca.components_[pc2]),
+            pca.transform(scaler.transform(data_initial))[:, pc1],
+            pca.transform(scaler.transform(data_initial))[:, pc2],
             marker='.', c=self.models.all_optimal_error[index]
         )
         ax.scatter(
-            scaler.transform(data_optimal).dot(pca.components_[pc1]),
-            scaler.transform(data_optimal).dot(pca.components_[pc2]),
+            pca.transform(scaler.transform(data_optimal))[:, pc1],
+            pca.transform(scaler.transform(data_optimal))[:, pc2],
             marker='*', c=self.models.all_optimal_error[index]
         )
 

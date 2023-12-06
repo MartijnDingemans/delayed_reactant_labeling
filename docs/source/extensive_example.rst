@@ -689,8 +689,10 @@ plateaus, not shown here), we can just take a model for each plateau and compare
 
 .. code-block:: python
 
-    VM.plot_biplot_all_runs(slice(60))
+    VM.plot_biplot_all_runs(slice(20))
 
 .. image:: images/extensive_example/plot_biplot_all_runs.png
     :width: 640
     :align: center
+
+Because we had three main plateaus in the optimal 20 runs, we only see 3 unique optimal points in the biplot.
