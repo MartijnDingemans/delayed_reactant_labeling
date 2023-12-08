@@ -47,7 +47,7 @@ class OptimizeResult(dict):
     x : ndarray
         The solution of the optimization.
     success : bool
-        Whether or not the optimizer exited successfully.
+        Whether the optimizer exited successfully.
     status : int
         Termination status of the optimizer. Its value depends on the
         underlying solver. Refer to `message` for details.
@@ -214,18 +214,6 @@ def minimize_neldermead(func, x0, args=(), callback=None,
 
     x0 = asfarray(x0).flatten()
 
-    if adaptive:
-        dim = float(len(x0))
-        rho = 1
-        chi = 1 + 2 / dim
-        psi = 0.75 - 1 / (2 * dim)
-        sigma = 1 - 1 / dim
-    else:
-        rho = 1
-        chi = 2
-        psi = 0.5
-        sigma = 0.5
-
     nonzdelt = 0.05
     zdelt = 0.00025
 
@@ -237,6 +225,22 @@ def minimize_neldermead(func, x0, args=(), callback=None,
         if np.any(lower_bound > x0) or np.any(x0 > upper_bound):
             warnings.warn("Initial guess is not within the specified bounds",
                           OptimizeWarning, 3)
+
+        n_dim = (upper_bound > lower_bound).sum()
+    else:
+        n_dim = float(len(x0))
+
+    if adaptive:
+        dim = n_dim
+        rho = 1
+        chi = 1 + 2 / dim
+        psi = 0.75 - 1 / (2 * dim)
+        sigma = 1 - 1 / dim
+    else:
+        rho = 1
+        chi = 2
+        psi = 0.5
+        sigma = 0.5
 
     if bounds is not None:
         x0 = np.clip(x0, lower_bound, upper_bound)
