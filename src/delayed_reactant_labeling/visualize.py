@@ -300,8 +300,10 @@ class VisualizeModel:
         file_name
             The file name for the image. This should not include any extension.
             If None (default), it is equal to 'plot_path_in_pca'.
-        pc1, pc2
-            The principal components that should be plotted.
+        pc1
+            The principal components that should be plotted against each other.
+        pc2
+            The principal components that should be plotted against each other.
         **fig_kwargs
             Additional keyword arguments that are passed on to plt.Figure().
 
@@ -466,9 +468,10 @@ class VisualizeModel:
         file_name
             The file name for the image. This should not include any extension.
             If None (default), it is equal to 'plot_rate_over_time'.
-        x_min, x_max
-            The values outside the range x_min to x_max will be plotted as x_min or x_max.
-
+        x_min
+            The values smaller than x_min will be plotted as x_min.
+        x_max
+            The values larger than x_max will be plotted as x_max.
         log_scale
             If true the data will be plotted on log_scale.
         **fig_kwargs
@@ -512,8 +515,10 @@ class VisualizeModel:
 
         Args
         ----
-        x_min, x_max
-            The minimum and maximum value x.
+        x_min
+            The minimum value of x.
+        x_max
+            The maximum value of x.
         file_name
             The file name for the image. This should not include any extension.
             If None (default), it is equal to 'plot_rate_sensitivity'.
@@ -711,7 +716,9 @@ class VisualizeModel:
             index=slice(1, 5) would plot the results of runs 1 upto and including 4,
             but the best run (0) would be skipped.
             index=slice(-5, None) would plot the results for the 5 worst models.
-        pc1, pc2
+        pc1
+            The principal components that should be plotted against each other.
+        pc2
             The principal components that should be plotted against each other.
         file_name
             The file name for the image. This should not include any extension.
