@@ -1,6 +1,0 @@
-For running stuff on the cluster, there is a lot of out-dated packages.
-To check the version of each package on the server run:
-python3.8 -m pip show PACKAGE
-
-to install the right package in pycharm open the terminal (bottom left) and run
-py -m pip install PACKAGE==YOURVERSION
