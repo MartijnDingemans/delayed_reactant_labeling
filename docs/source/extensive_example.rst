@@ -39,7 +39,7 @@ First we import the required modules, and show the original data around the time
     from delayed_reactant_labeling.predict import DRL
 
     experimental_complete = pd.read_excel('experimental_data_Hilgers.xlsx', engine='openpyxl')
-    LABEL = "'"  # single ' will was used for labeled reactants. To keep the code general, we will use LABEL instead.
+    LABEL = "'"  # single ' was used for labeled reactants. To keep the code general, we will use LABEL instead.
 
     fig, ax = plt.subplots()
     n = 0
