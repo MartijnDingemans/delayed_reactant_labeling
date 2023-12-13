@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Implementation details &mdash; Delayed-Reactant-Labeling 0.2.5 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/copybutton.css" type="text/css" />
+      <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=e9ffd43a"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=4825356b"></script>
+        <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+        <script src="_static/copybutton.js?v=f281be69"></script>
+        <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Extensive example" href="extensive_example.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Delayed-Reactant-Labeling
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="predict.html">Predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="optimize.html">Optimize</a></li>
+<li class="toctree-l1"><a class="reference internal" href="visualize.html">Visualize</a></li>
+<li class="toctree-l1"><a class="reference internal" href="extensive_example.html">Extensive example</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Implementation details</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#rate-equations">Rate equations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#estimating-the-jacobian">Estimating the Jacobian</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#explict-euler-formula">Explict Euler formula</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Delayed-Reactant-Labeling</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Implementation details</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/design_choices.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="implementation-details">
+<h1>Implementation details<a class="headerlink" href="#implementation-details" title="Permalink to this heading"></a></h1>
+<section id="rate-equations">
+<span id="id1"></span><h2>Rate equations<a class="headerlink" href="#rate-equations" title="Permalink to this heading"></a></h2>
+<p>To be able to calculate the rate of change per chemical as a function of the current concentrations in the system,
+the <a class="reference internal" href="predict.html#predict.DRL" title="predict.DRL"><code class="xref py py-class docutils literal notranslate"><span class="pre">predict.DRL</span></code></a> class analyzes the reactions. The rate equation of each chemical for the complete model
+can be decomposed into the rate equations caused by each reaction step in the system.
+These reaction steps are what the user inputs into the model.</p>
+<div class="math notranslate nohighlight">
+\[\frac{dc}{dt} = \sum_{r}{ \frac{dc_r}{dt} }\]</div>
+<p>We can first initialize an array for <span class="math notranslate nohighlight">\(dc/dt\)</span> filled with zeros, subsequently loop over each reaction step, and
+calculate the amount of created chemical(s) as follows:</p>
+<div class="math notranslate nohighlight">
+\[\frac{dc_r}{dt} = k_r \prod{[q_r]}\]</div>
+<p>where, <span class="math notranslate nohighlight">\(k\)</span> is the rate constant for reaction <span class="math notranslate nohighlight">\(r\)</span> with reactants <span class="math notranslate nohighlight">\(q\)</span>. We add this amount to each
+product of the reaction step, whereas we subtract it from each reactant.</p>
+</section>
+<section id="estimating-the-jacobian">
+<span id="jacobian"></span><h2>Estimating the Jacobian<a class="headerlink" href="#estimating-the-jacobian" title="Permalink to this heading"></a></h2>
+<p>The Jacobian matrix is a matrix containing the partial derivatives of the rate equations of chemical <span class="math notranslate nohighlight">\(i\)</span> with
+respect to each chemical <span class="math notranslate nohighlight">\(j\)</span>. Similarly to how we analyzed the rate equations we can again decompose the entire
+model into individual reaction steps:</p>
+<div class="math notranslate nohighlight">
+\[J_{i, j} =  \frac{\delta (di/dt)}{\delta j} = \sum_{r}{\frac{\delta (di_r/dt)}{\delta j}}\]</div>
+<p>We can again initialize a matrix containing only zeros, loop over each reaction step, and calculate the partial
+derivative with respect to each reactant. Partial derivatives with respect to a product do not have to be considered
+as the corresponding rate equation would not contain a term including it and therefore be zero
+(<span class="math notranslate nohighlight">\(d(k \cdot a \cdot b)/dc=0\)</span>, whereas <span class="math notranslate nohighlight">\(d(k \cdot a \cdot b)/db=k \cdot a\)</span>).</p>
+<p>To calculate the partial derivative we than take the product of the concentrations of all reactants, <span class="math notranslate nohighlight">\(q\)</span>,
+except the reactant whose derivative we take.</p>
+<div class="math notranslate nohighlight">
+\[\frac{\delta (di_r/dt)}{\delta j} = k_r \cdot \prod^{q_r}_{q_r \ne j}{[q_r]}\]</div>
+<p>Subsequently we multiply this with the rate constant, <span class="math notranslate nohighlight">\(k\)</span>, and add this to all reaction products, whereas
+we subtract it from each reactant. Because we take a very simple approach to calculating the derivative, this method only
+works for reaction steps which are first order in each chemical.</p>
+</section>
+<section id="explict-euler-formula">
+<h2>Explict Euler formula<a class="headerlink" href="#explict-euler-formula" title="Permalink to this heading"></a></h2>
+<p>The explicit Euler formula takes the rate of changes as calculated above, and adds it to the currently known concentrations.
+It repeats this the number of <code class="docutils literal notranslate"><span class="pre">steps_per_step</span></code> times, and discards the intermediate results. The last
+array of predicted concentration is saved at the corresponding time stamp.</p>
+<p>This method does not work well in stiff problems, and using an ODE solver is recommended.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="extensive_example.html" class="btn btn-neutral float-left" title="Extensive example" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Martijn Dingemans.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

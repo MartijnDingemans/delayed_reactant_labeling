@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Optimize &mdash; Delayed-Reactant-Labeling 0.2.5 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/copybutton.css" type="text/css" />
+      <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=e9ffd43a"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=4825356b"></script>
+        <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+        <script src="_static/copybutton.js?v=f281be69"></script>
+        <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Visualize" href="visualize.html" />
+    <link rel="prev" title="Predict" href="predict.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Delayed-Reactant-Labeling
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="predict.html">Predict</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Optimize</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#optimize.RateConstantOptimizerTemplate"><code class="docutils literal notranslate"><span class="pre">RateConstantOptimizerTemplate</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#optimize.RateConstantOptimizerTemplate.create_prediction"><code class="docutils literal notranslate"><span class="pre">create_prediction()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#optimize.RateConstantOptimizerTemplate.calculate_curves"><code class="docutils literal notranslate"><span class="pre">calculate_curves()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#optimize.RateConstantOptimizerTemplate.calculate_errors"><code class="docutils literal notranslate"><span class="pre">calculate_errors()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#optimize.RateConstantOptimizerTemplate.weigh_errors"><code class="docutils literal notranslate"><span class="pre">weigh_errors()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#optimize.RateConstantOptimizerTemplate.calculate_total_error"><code class="docutils literal notranslate"><span class="pre">calculate_total_error()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#optimize.RateConstantOptimizerTemplate.optimize"><code class="docutils literal notranslate"><span class="pre">optimize()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#optimize.RateConstantOptimizerTemplate.optimize_multiple"><code class="docutils literal notranslate"><span class="pre">optimize_multiple()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#optimize.RateConstantOptimizerTemplate.load_optimized_model"><code class="docutils literal notranslate"><span class="pre">load_optimized_model()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#optimize.OptimizedModel"><code class="docutils literal notranslate"><span class="pre">OptimizedModel</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#optimize.OptimizedMultipleModels"><code class="docutils literal notranslate"><span class="pre">OptimizedMultipleModels</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#optimize.OptimizedMultipleModels.get_model"><code class="docutils literal notranslate"><span class="pre">get_model()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#example">Example</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="visualize.html">Visualize</a></li>
+<li class="toctree-l1"><a class="reference internal" href="extensive_example.html">Extensive example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="design_choices.html">Implementation details</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Delayed-Reactant-Labeling</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Optimize</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/optimize.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="optimize">
+<h1>Optimize<a class="headerlink" href="#optimize" title="Permalink to this heading"></a></h1>
+<p>To optimize the rate constants, a model needs to be created that can create a prediction of the concentrations, compare
+it with the experimental data, and subsequently calculate the corresponding errors. This model can then:</p>
+<ol class="arabic simple">
+<li><p>Create a guess of the rate constants.</p></li>
+<li><p>Compare the result of the prediction with the experimental data</p></li>
+<li><p>Weigh the errors</p></li>
+<li><p>Save the intermediate results</p></li>
+<li><p>It will then repeat 1-4 with new rate constants until the error no longer improves and the rate constants have converged to a stable value or the maximum number of iterations has been reached. The method that is used to find the next set of rate constants is the <a class="reference external" href="https://docs.scipy.org/doc/scipy/reference/optimize.minimize-neldermead.html">Nelder-Mead</a> algorithm with adaptive parameters.</p></li>
+</ol>
+<p>The <a class="reference internal" href="#optimize.RateConstantOptimizerTemplate" title="optimize.RateConstantOptimizerTemplate"><code class="xref py py-class docutils literal notranslate"><span class="pre">optimize.RateConstantOptimizerTemplate</span></code></a> is an abstract base class which has implemented the numbered steps
+above. However, the user must define the error functions and the exact methodology of creating a prediction. The definition
+of the error functions consists out of two parts. First the data (either experimental or predicted) must be converted to
+a curve of interest, such as: <span class="math notranslate nohighlight">\(A / (A + A_{labeled})\)</span>. Subsequently a <code class="docutils literal notranslate"><span class="pre">metric</span></code> wil be used to evaluate the
+error between each curve of both datasets.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="optimize.RateConstantOptimizerTemplate">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">optimize.</span></span><span class="sig-name descname"><span class="pre">RateConstantOptimizerTemplate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">experimental</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metric</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">raw_weights</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#optimize.RateConstantOptimizerTemplate" title="Permalink to this definition"></a></dt>
+<dd><p>Enables easy optimization of a model, which must be semi-implemented by the user.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The user must implement the following abstract functions:</p>
+<ol class="arabic simple">
+<li><p><a class="reference internal" href="#optimize.RateConstantOptimizerTemplate.create_prediction" title="optimize.RateConstantOptimizerTemplate.create_prediction"><code class="xref py py-meth docutils literal notranslate"><span class="pre">create_prediction()</span></code></a></p></li>
+<li><p><a class="reference internal" href="#optimize.RateConstantOptimizerTemplate.calculate_curves" title="optimize.RateConstantOptimizerTemplate.calculate_curves"><code class="xref py py-meth docutils literal notranslate"><span class="pre">calculate_curves()</span></code></a></p></li>
+</ol>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>experimental</strong> (<em>pd.DataFrame</em>) – The experimental data</p></li>
+<li><p><strong>metric</strong> (<em>Callable</em><em>[</em><em>[</em><em>np.ndarray</em><em>, </em><em>np.ndarray</em><em>]</em><em>, </em><em>float</em><em>]</em>) – An error metric which takes as input two np.ndarrays for the keywords <code class="docutils literal notranslate"><span class="pre">y_pred</span></code> and <code class="docutils literal notranslate"><span class="pre">y_true</span></code>
+and returns a float. Lower values should indicate a better prediction.</p></li>
+<li><p><strong>raw_weights</strong> (<em>Optional</em><em>[</em><em>dict</em><em>[</em><em>str</em><em>, </em><em>float</em><em>]</em><em>]</em>) – A dictionary containing patterns and weight. Each pattern will be searched for in the errors.
+Upon a match the error yielded will be multiplied by its respective weight. If an error is matched with multiple
+patterns, the weight will be decreased in a multiplicative manner. If None (default), no weights will be applied.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Variables<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>weights</strong> (<em>Optional</em><em>[</em><em>np.ndarray</em><em>]</em>) – The final weight per error type.</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="optimize.RateConstantOptimizerTemplate.create_prediction">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">create_prediction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_description</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#optimize.RateConstantOptimizerTemplate.create_prediction" title="Permalink to this definition"></a></dt>
+<dd><p>Creates a prediction of the system, given a set of parameters.
+For DRL experiments <a class="reference internal" href="predict.html#predict.DRL.predict_concentration" title="predict.DRL.predict_concentration"><code class="xref py py-meth docutils literal notranslate"><span class="pre">DRL.predict_concentration</span></code></a>
+does most of the required calculations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> (<em>np.ndarray</em>) – Contains all parameters, which are to be optimized.</p></li>
+<li><p><strong>x_description</strong> (<em>list</em><em>[</em><em>str</em><em>]</em>) – The description of each parameter.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A DataFrame that contains the predicted concentrations as a function of time.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="optimize.RateConstantOptimizerTemplate.calculate_curves">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">calculate_curves</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#optimize.RateConstantOptimizerTemplate.calculate_curves" title="Permalink to this definition"></a></dt>
+<dd><p>Calculates the curves corresponding to the data (either experimental or predicted).
+The experimental curves will only be calculated upon initialization and are stored for subsequent use.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>data</strong> (<em>pd.DataFrame</em>) – The data from which the curves should be calculated. Either experimental or predicted by <a class="reference internal" href="#optimize.RateConstantOptimizerTemplate.create_prediction" title="optimize.RateConstantOptimizerTemplate.create_prediction"><code class="xref py py-meth docutils literal notranslate"><span class="pre">create_prediction()</span></code></a>.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A dictionary containing a description of each curve, and the corresponding curve.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict[str, np.ndarray]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="optimize.RateConstantOptimizerTemplate.calculate_errors">
+<span class="sig-name descname"><span class="pre">calculate_errors</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prediction</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#optimize.RateConstantOptimizerTemplate.calculate_errors" title="Permalink to this definition"></a></dt>
+<dd><p>Calculates the (unweighted) error caused by each error function.
+This is done by calculating the curves corresponding to the prediction,
+and comparing them with the experimental curves using the metric.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>prediction</strong> (<em>DataFrame</em>) – The predicted concentrations as a function of time</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The unweighted errors of each error function.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.Series</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – When the metric returns a nan value, a ValueError will be raised. The error message will detail information
+    on which curves caused the metric to return nan.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="optimize.RateConstantOptimizerTemplate.weigh_errors">
+<span class="sig-name descname"><span class="pre">weigh_errors</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">errors</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#optimize.RateConstantOptimizerTemplate.weigh_errors" title="Permalink to this definition"></a></dt>
+<dd><p>Weighs the errors.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>errors</strong> (<em>Series</em>) – The unweighted errors</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The weighted errors</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.Series</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="optimize.RateConstantOptimizerTemplate.calculate_total_error">
+<span class="sig-name descname"><span class="pre">calculate_total_error</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">errors</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#optimize.RateConstantOptimizerTemplate.calculate_total_error" title="Permalink to this definition"></a></dt>
+<dd><p>Weighs and sums the errors.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>errors</strong> (<em>Series</em>) – The unweighted errors</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The total error in the model.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="optimize.RateConstantOptimizerTemplate.optimize">
+<span class="sig-name descname"><span class="pre">optimize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_description</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_bounds</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">maxiter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">50000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">resume_from_simplex</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_pbar</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_overwrite_log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#optimize.RateConstantOptimizerTemplate.optimize" title="Permalink to this definition"></a></dt>
+<dd><p>Optimizes the system, utilizing a nelder-mead algorithm.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x0</strong> (<em>np.ndarray</em>) – Parameters which are to be optimized. Always contains the rate constants.</p></li>
+<li><p><strong>x_description</strong> (<em>list</em><em>[</em><em>str</em><em>]</em>) – Description of each parameter.</p></li>
+<li><p><strong>x_bounds</strong> (<em>Bounds</em>) – The scipy.optimize.bounds of each parameter.</p></li>
+<li><p><strong>path</strong> (<em>str</em><em> | </em><em>pathlib.Path</em>) – The path to the folder where the optimization progress should be stored.
+The entire path to the folder will be created if it did not exist.</p></li>
+<li><p><strong>metadata</strong> (<em>Optional</em><em>[</em><em>dict</em><em>]</em>) – The metadata that should be saved alongside the solution.
+This data will be stored in the settings_info.json file.</p></li>
+<li><p><strong>maxiter</strong> (<em>float</em>) – The maximum number of iterations.</p></li>
+<li><p><strong>resume_from_simplex</strong> (<em>np.ndarray</em>) – When a simplex is given of size [N+1, N] where N is the number of parameters, the solution starts here.
+This can be used to resume the optimization process.</p></li>
+<li><p><strong>show_pbar</strong> (<em>bool</em>) – If True, shows a progress bar.</p></li>
+<li><p><strong>_overwrite_log</strong> (<em>bool</em>) – If True, the logs will be overwritten.
+Should only be used in test scripts to avoid accidental loss of data.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>All relevant metadata and progress on each iteration will be stored in path. It can be loaded and analyzed
+either by using the <a class="reference internal" href="visualize.html#visualize.VisualizeModel" title="visualize.VisualizeModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">visualize.VisualizeModel</span></code></a>, or <code class="xref py py-meth docutils literal notranslate"><span class="pre">load_optimization_progress</span></code> which returns
+an <a class="reference internal" href="#optimize.OptimizedModel" title="optimize.OptimizedModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">optimize.OptimizedModel</span></code></a> instance.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="optimize.RateConstantOptimizerTemplate.optimize_multiple">
+<span class="sig-name descname"><span class="pre">optimize_multiple</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_runs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_description</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_bounds</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x0_bounds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x0_min</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-06</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_jobs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backend</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'loky'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">optimize_kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#optimize.RateConstantOptimizerTemplate.optimize_multiple" title="Permalink to this definition"></a></dt>
+<dd><p>Optimizes the system, utilizing a nelder-mead algorithm, for a given number of runs.
+Each run has random starting positions for each parameter, which is distributed according to a loguniform
+distribution. This choice of distribution allows the model to sample each parameter equally a logarithmic scale,
+for example k1 will be sampled just as often between 10e-5 and 10e-4 as between 0.1 and 1, allowing a wide
+range of values to be examined. The bounds of the starting position (x0_bounds) can be separately controlled
+from the bounds the system is allowed to explore (x_bounds). If the given path already has an existing directory
+called ‘optimization_multiple_guess’, the optimization will be resumed from that point onwards.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em><em> | </em><em>pathlib.Path</em>) – The path to the folder where the optimization progress should be stored.</p></li>
+<li><p><strong>n_runs</strong> (<em>int</em>) – The number of runs which are to be computed.</p></li>
+<li><p><strong>x_description</strong> (<em>list</em><em>[</em><em>str</em><em>]</em>) – Description of each parameter.</p></li>
+<li><p><strong>x_bounds</strong> (<em>Bounds</em>) – The scipy.optimize.bounds of each parameter.</p></li>
+<li><p><strong>x0_bounds</strong> (<em>Optional</em><em>[</em><em>Bounds</em><em>]</em>) – The scipy.optimize.bounds for the starting value of each parameter.
+By default, it is identical to the x_bounds. Lower bounds smaller than x0_min are set to x0_min.
+When the upper bound is 0, the corresponding x0 will also be set to 0. This disables the reaction.</p></li>
+<li><p><strong>x0_min</strong> (<em>float</em>) – The minimum value the lower bound of x0_bounds can take. Any values lower than it is set to x0_min.</p></li>
+<li><p><strong>n_jobs</strong> (<em>int</em>) – The number of processes which should be used, allowing negative indexing, i.e. n_jobs=-1 would use up all
+available cores, n_jobs=-2 would use all available cores except one, etc.</p></li>
+<li><p><strong>backend</strong> (<em>str</em>) – The backend that is used by Joblib. Loky (default) works on all platforms.</p></li>
+<li><p><strong>**optimize_kwargs</strong> – The key word arguments that will be passed to self.optimize.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>All data of run n will be stored at ‘path/guess_n/’.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="optimize.RateConstantOptimizerTemplate.load_optimized_model">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">load_optimized_model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#optimize.RateConstantOptimizerTemplate.load_optimized_model" title="Permalink to this definition"></a></dt>
+<dd><p>Loads in the data from the log files.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>path</strong> (<em>str</em><em> | </em><em>pathlib.Path</em>) – The path to the folder where the optimization progress has been stored.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A structured OptimizerProgress instance which contains all information that was logged.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#optimize.OptimizedModel" title="optimize.OptimizedModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">OptimizedModel</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="optimize.OptimizedModel">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">optimize.</span></span><span class="sig-name descname"><span class="pre">OptimizedModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#optimize.OptimizedModel" title="Permalink to this definition"></a></dt>
+<dd><p>Formatted data structure of an optimized model.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>path</strong> (<em>str</em><em> | </em><em>pathlib.Path</em>) – The path to the folder where the optimization progress has been stored.</p>
+</dd>
+<dt class="field-even">Variables<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>metadata</strong> (<em>dict</em><em>[</em><em>str</em><em>, </em><em>any</em><em>]</em>) – The stored metadata.</p></li>
+<li><p><strong>x_description</strong> (<em>list</em><em>[</em><em>str</em><em>]</em>) – The description of each parameter.</p></li>
+<li><p><strong>n_dimensions</strong> (<em>int</em>) – The number of parameters.</p></li>
+<li><p><strong>n_function_evaluations</strong> (<em>int</em>) – The number of computed iterations.</p></li>
+<li><p><strong>all_x</strong> (<em>pd.DataFrame</em>) – The applied parameters for each iteration.</p></li>
+<li><p><strong>all_errors</strong> (<em>pd.Series</em>) – The error for each iteration.</p></li>
+<li><p><strong>all_times</strong> (<em>pd.Series</em>) – The timestamp at which the computation of each iteration was finished.</p></li>
+<li><p><strong>optimal_x</strong> (<em>pd.Series</em>) – The parameters for the iteration with the lowest error.</p></li>
+<li><p><strong>optimal_error</strong> (<em>float</em>) – The error corresponding to the iteration with the lowest error.</p></li>
+<li><p><strong>simplex</strong> (<em>np.ndarray</em>) – An array of size [N + 1, N] corresponding to the N parameters for each of the N + 1 best iterations</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="optimize.OptimizedMultipleModels">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">optimize.</span></span><span class="sig-name descname"><span class="pre">OptimizedMultipleModels</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#optimize.OptimizedMultipleModels" title="Permalink to this definition"></a></dt>
+<dd><p>Formatted data structure for multiple optimized models.
+The data will be formatted such that the best run starts at index 0,
+and the error ascends with each index number.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>path</strong> (<em>str</em><em> | </em><em>pathlib.Path</em>) – The path to the directory, which contains subdirectories.
+Each subdirectory in turn should contain its optimization progress.</p>
+</dd>
+<dt class="field-even">Variables<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>x_description</strong> (<em>list</em><em>[</em><em>str</em><em>]</em>) – The description of each parameter.</p></li>
+<li><p><strong>all_initial_x</strong> (<em>pd.DataFrame</em>) – The initial parameters, x, in each model.</p></li>
+<li><p><strong>all_optimal_x</strong> (<em>pd.DataFrame</em>) – The optimal parameters, x, in each model.</p></li>
+<li><p><strong>all_optimal_error</strong> (<em>np.ndarray</em>) – The error when using the optimal parameters in each model.</p></li>
+<li><p><strong>best</strong> (<a class="reference internal" href="#optimize.OptimizedModel" title="optimize.OptimizedModel"><em>OptimizedModel</em></a>) – The model with the lowest error.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="optimize.OptimizedMultipleModels.get_model">
+<span class="sig-name descname"><span class="pre">get_model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#optimize.OptimizedMultipleModels.get_model" title="Permalink to this definition"></a></dt>
+<dd><p>Returns the n-th model, when sorted by the error (the best model at index 0).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>n</strong> (<em>int</em>) – The index of the model that is to be retrieved.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#optimize.OptimizedModel" title="optimize.OptimizedModel"><em>OptimizedModel</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<section id="example">
+<span id="optimizeexample"></span><h2>Example<a class="headerlink" href="#example" title="Permalink to this heading"></a></h2>
+<p>To optimize the rate constants we will analyze a simple system. We can describe the model and the experimental
+conditions as follows:</p>
+<div class="math notranslate nohighlight">
+\[\require{mhchem}
+\ce{catalyst + A &lt;=&gt;[\ce{k1}][\ce{k_{-1}}] B -&gt;[\ce{{k2}}] C + catalyst}\]</div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="n">reactions</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="p">(</span><span class="s1">&#39;k1&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;A&#39;</span><span class="p">,</span> <span class="s1">&#39;cat&#39;</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;B&#39;</span><span class="p">],),</span>
+    <span class="p">(</span><span class="s1">&#39;k-1&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;B&#39;</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;A&#39;</span><span class="p">,</span> <span class="s1">&#39;cat&#39;</span><span class="p">],),</span>
+    <span class="p">(</span><span class="s1">&#39;k2&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;B&#39;</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;cat&#39;</span><span class="p">]),</span>
+
+    <span class="c1"># labeled</span>
+    <span class="p">(</span><span class="s1">&#39;k1&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;A-d10&#39;</span><span class="p">,</span> <span class="s1">&#39;cat&#39;</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;B-d10&#39;</span><span class="p">],),</span>
+    <span class="p">(</span><span class="s1">&#39;k-1&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;B-d10&#39;</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;A-d10&#39;</span><span class="p">,</span> <span class="s1">&#39;cat&#39;</span><span class="p">],),</span>
+    <span class="p">(</span><span class="s1">&#39;k2&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;B-d10&#39;</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;C-d10&#39;</span><span class="p">,</span> <span class="s1">&#39;cat&#39;</span><span class="p">])</span>
+<span class="p">]</span>
+
+<span class="c1"># look at as simple of a system as possible.</span>
+<span class="n">concentration_initial</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;A&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;cat&#39;</span><span class="p">:</span> <span class="mi">1</span> <span class="o">/</span> <span class="mi">5</span><span class="p">}</span>
+<span class="n">concentration_labeled</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;A-d10&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">}</span>
+<span class="n">dilution_factor</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">time_pre</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">50</span><span class="p">)</span>
+<span class="n">time_post</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">90</span><span class="p">,</span> <span class="mi">8</span> <span class="o">*</span> <span class="mi">50</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>To be able to fit to this hypothetical reaction fake data was generated by first creating a prediction using the <a class="reference internal" href="predict.html#predict.DRL" title="predict.DRL"><code class="xref py py-class docutils literal notranslate"><span class="pre">DRL</span></code></a>
+class. To this data we than add noise based on its intensity and a base level of noise to mimic real experimental data.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">delayed_reactant_labeling.predict</span> <span class="kn">import</span> <span class="n">DRL</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+
+<span class="c1"># create a &quot;real&quot; prediction.</span>
+<span class="n">rate_constants_real</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;k1&#39;</span><span class="p">:</span> <span class="mf">0.3</span><span class="p">,</span> <span class="s1">&#39;k-1&#39;</span><span class="p">:</span> <span class="mf">0.05</span><span class="p">,</span> <span class="s1">&#39;k2&#39;</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">}</span>
+<span class="n">drl_real</span> <span class="o">=</span> <span class="n">DRL</span><span class="p">(</span><span class="n">rate_constants</span><span class="o">=</span><span class="n">rate_constants_real</span><span class="p">,</span> <span class="n">reactions</span><span class="o">=</span><span class="n">reactions</span><span class="p">)</span>
+<span class="n">real_data</span> <span class="o">=</span> <span class="n">drl_real</span><span class="o">.</span><span class="n">predict_concentration</span><span class="p">(</span>
+    <span class="n">t_eval_pre</span><span class="o">=</span><span class="n">time_pre</span><span class="p">,</span>
+    <span class="n">t_eval_post</span><span class="o">=</span><span class="n">time_post</span><span class="p">,</span>
+    <span class="n">dilution_factor</span><span class="o">=</span><span class="n">dilution_factor</span><span class="p">,</span>
+    <span class="n">initial_concentrations</span><span class="o">=</span><span class="n">concentration_initial</span><span class="p">,</span>
+    <span class="n">labeled_concentration</span><span class="o">=</span><span class="n">concentration_labeled</span><span class="p">)</span>
+
+<span class="c1"># add noise</span>
+<span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
+<span class="n">fake_data</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">real_data</span><span class="o">.</span><span class="n">columns</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>  <span class="c1"># the last column contains a time array, so skip that one.</span>
+    <span class="n">noise_dynamic</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">real_data</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>  <span class="c1"># fraction error</span>
+    <span class="n">noise_static</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="mf">0.015</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mf">0.0075</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">real_data</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+    <span class="n">fake_col</span> <span class="o">=</span> <span class="n">real_data</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">*</span> <span class="n">noise_dynamic</span> <span class="o">+</span> <span class="n">noise_static</span>
+    <span class="n">fake_col</span><span class="p">[</span><span class="n">fake_col</span> <span class="o">&lt;</span> <span class="mf">1e-10</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1e-10</span>  <span class="c1"># no negative intensity</span>
+    <span class="n">fake_data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">fake_col</span><span class="p">)</span>
+<span class="n">fake_data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">real_data</span><span class="p">[</span><span class="s1">&#39;time&#39;</span><span class="p">])</span>
+<span class="n">fake_data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">fake_data</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">real_data</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>
+
+<span class="c1"># visualize</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">()</span>
+<span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">fake_data</span><span class="o">.</span><span class="n">columns</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">time_post</span><span class="p">,</span> <span class="n">real_data</span><span class="p">[</span><span class="n">col</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;tab:gray&quot;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">time_post</span><span class="p">,</span> <span class="n">fake_data</span><span class="p">[</span><span class="n">col</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="n">col</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;tab:gray&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;real&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;time&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;intensity&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="_images/optimize_fakedata.png"><img alt="_images/optimize_fakedata.png" class="align-center" src="_images/optimize_fakedata.png" style="width: 600px;" /></a>
+<p>The <a class="reference internal" href="#optimize.RateConstantOptimizerTemplate" title="optimize.RateConstantOptimizerTemplate"><code class="xref py py-class docutils literal notranslate"><span class="pre">RateConstantOptimizerTemplate</span></code></a> contains several functions which allow it to optimize a model.
+However, it does require the user to define two functions. The first <a class="reference internal" href="#optimize.RateConstantOptimizerTemplate.create_prediction" title="optimize.RateConstantOptimizerTemplate.create_prediction"><code class="xref py py-meth docutils literal notranslate"><span class="pre">create_prediction</span></code></a>
+should tell the class how exactly it can create a prediction from a given set of parameters.
+This function allows the user also to modify the parameters its given, or to modify the output of the prediction.
+The second function <a class="reference internal" href="#optimize.RateConstantOptimizerTemplate.calculate_curves" title="optimize.RateConstantOptimizerTemplate.calculate_curves"><code class="xref py py-meth docutils literal notranslate"><span class="pre">calculate_curves</span></code></a> describes how
+the data should be analyzed.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>  <span class="c1"># required for compatibility with python 3.8</span>
+<span class="kn">from</span> <span class="nn">delayed_reactant_labeling.predict</span> <span class="kn">import</span> <span class="n">DRL</span>
+<span class="kn">from</span> <span class="nn">delayed_reactant_labeling.optimize</span> <span class="kn">import</span> <span class="n">RateConstantOptimizerTemplate</span>
+
+<span class="k">class</span> <span class="nc">RateConstantOptimizer</span><span class="p">(</span><span class="n">RateConstantOptimizerTemplate</span><span class="p">):</span>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">create_prediction</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">x_description</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+        <span class="n">rate_constants</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">x_description</span><span class="p">)</span>
+        <span class="c1"># The rate constants can easily be manipulated here. For example,</span>
+        <span class="c1"># rate_constants[&quot;k1&quot;] = 0.42 would fixate that value.</span>
+        <span class="c1"># Because Series are mutable, the changed version will be stored in the logs!</span>
+
+        <span class="n">drl</span> <span class="o">=</span> <span class="n">DRL</span><span class="p">(</span><span class="n">reactions</span><span class="o">=</span><span class="n">reactions</span><span class="p">,</span> <span class="n">rate_constants</span><span class="o">=</span><span class="n">rate_constants</span><span class="p">)</span>
+        <span class="n">pred_labeled</span> <span class="o">=</span> <span class="n">drl</span><span class="o">.</span><span class="n">predict_concentration</span><span class="p">(</span>
+            <span class="n">t_eval_pre</span><span class="o">=</span><span class="n">time_pre</span><span class="p">,</span>
+            <span class="n">t_eval_post</span><span class="o">=</span><span class="n">time_post</span><span class="p">,</span>
+            <span class="n">initial_concentrations</span><span class="o">=</span><span class="n">concentration_initial</span><span class="p">,</span>
+            <span class="n">labeled_concentration</span><span class="o">=</span><span class="n">concentration_labeled</span><span class="p">,</span>
+            <span class="n">dilution_factor</span><span class="o">=</span><span class="n">dilution_factor</span><span class="p">,</span>
+            <span class="n">rtol</span><span class="o">=</span><span class="mf">1e-8</span><span class="p">,</span>
+            <span class="n">atol</span><span class="o">=</span><span class="mf">1e-8</span><span class="p">,</span> <span class="p">)</span>
+
+        <span class="c1"># The prediction can be altered here before its analyzed.</span>
+        <span class="k">return</span> <span class="n">pred_labeled</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">calculate_curves</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+        <span class="n">curves</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">chemical</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;A&#39;</span><span class="p">,</span> <span class="s1">&#39;B&#39;</span><span class="p">,</span> <span class="s1">&#39;C&#39;</span><span class="p">]:</span>
+            <span class="n">chemical_sum</span> <span class="o">=</span> <span class="n">data</span><span class="p">[[</span><span class="n">chemical</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">chemical</span><span class="si">}</span><span class="s1">-d10&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">curves</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;ratio_</span><span class="si">{</span><span class="n">chemical</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">chemical</span><span class="p">]</span> <span class="o">/</span> <span class="n">chemical_sum</span><span class="p">)</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">curves</span>
+</pre></div>
+</div>
+<p>Internally the class compares the curves of the predicted data with the experimental data using a metric function. The
+function that calculates the Mean Absolute Error can for example be defined as follows:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">metric</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="n">y_pred</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">average</span><span class="p">(</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">y_true</span> <span class="o">-</span> <span class="n">y_pred</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>The <a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.average.html#numpy-average">np.average</a> function also
+takes a weight keyword, so this can easily be implemented into the metric. Other functions such as
+<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.nanmean.html#numpy-nanmean">np.nanmean</a> can be used to skip
+NaN values. <a class="reference external" href="https://scikit-learn.org/stable/modules/model_evaluation.html#regression-metrics">Scikit-learn.metrics</a>
+implements a lot of different metrics and is a great resource. However, their functions also always check the arguments very
+precisely, which can lead to significant slow-downs.</p>
+<p>To start optimizing this system we do the following:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">scipy.optimize</span> <span class="kn">import</span> <span class="n">Bounds</span>
+<span class="n">description</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;k1&#39;</span><span class="p">,</span> <span class="s1">&#39;k-1&#39;</span><span class="p">,</span> <span class="s1">&#39;k2&#39;</span><span class="p">]</span>
+<span class="n">bounds</span> <span class="o">=</span> <span class="n">Bounds</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1e-9</span><span class="p">,</span> <span class="mf">1e-9</span><span class="p">,</span> <span class="mf">1e-9</span><span class="p">]),</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">100</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">100</span><span class="p">]))</span>  <span class="c1">#lower bound, upper bound</span>
+
+<span class="n">RCO</span> <span class="o">=</span> <span class="n">RateConstantOptimizer</span><span class="p">(</span><span class="n">experimental</span><span class="o">=</span><span class="n">fake_data</span><span class="p">,</span> <span class="n">metric</span><span class="o">=</span><span class="n">metric</span><span class="p">)</span>
+<span class="n">RCO</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span>
+    <span class="n">x0</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]),</span>
+    <span class="n">x_description</span><span class="o">=</span><span class="n">description</span><span class="p">,</span>
+    <span class="n">x_bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">,</span>
+    <span class="n">path</span><span class="o">=</span><span class="s1">&#39;./optimization/&#39;</span><span class="p">,</span> <span class="n">_overwrite_log</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">RCO</span><span class="o">.</span><span class="n">load_optimized_model</span><span class="p">(</span><span class="s1">&#39;./optimization/&#39;</span><span class="p">)</span>
+
+<span class="n">model</span><span class="o">.</span><span class="n">best_X</span>
+<span class="c1"># k1,   2.112804e-01</span>
+<span class="c1"># k-1,  1.000000e-09</span>
+<span class="c1"># k2,   6.424953e-01</span>
+</pre></div>
+</div>
+<p>However, the results of a optimization run are heavily dependent on its starting position, especially for systems
+with many different reactions. To analyze multiple runs from different starting positions we can use:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">RCO</span><span class="o">.</span><span class="n">optimize_multiple</span><span class="p">(</span>
+    <span class="n">path</span><span class="o">=</span><span class="s1">&#39;./optimization_multiple/&#39;</span><span class="p">,</span>
+    <span class="n">n_runs</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+    <span class="n">x_description</span><span class="o">=</span><span class="n">description</span><span class="p">,</span>
+    <span class="n">x_bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">,</span>
+    <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">2</span><span class="p">,</span>  <span class="c1"># use all cpu&#39;s except one.</span>
+<span class="p">)</span>
+
+<span class="kn">from</span> <span class="nn">delayed_reactant_labeling.optimize</span> <span class="kn">import</span> <span class="n">OptimizedMultipleModels</span>
+<span class="n">models</span> <span class="o">=</span> <span class="n">OptimizedMultipleModels</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="s1">&#39;./optimization_multiple/&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">best</span><span class="o">.</span><span class="n">optimal_x</span><span class="p">)</span>
+<span class="c1"># k1     2.112738e-01</span>
+<span class="c1"># k-1    1.000000e-09</span>
+<span class="c1"># k2     6.425392e-01</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="predict.html" class="btn btn-neutral float-left" title="Predict" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="visualize.html" class="btn btn-neutral float-right" title="Visualize" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Martijn Dingemans.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

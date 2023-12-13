@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Predict &mdash; Delayed-Reactant-Labeling 0.2.5 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/copybutton.css" type="text/css" />
+      <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=e9ffd43a"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=4825356b"></script>
+        <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+        <script src="_static/copybutton.js?v=f281be69"></script>
+        <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Optimize" href="optimize.html" />
+    <link rel="prev" title="Getting started" href="installation.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Delayed-Reactant-Labeling
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Getting started</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Predict</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#predict.DRL"><code class="docutils literal notranslate"><span class="pre">DRL</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#predict.DRL.predict_concentration"><code class="docutils literal notranslate"><span class="pre">predict_concentration()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#predict.DRL.predict_concentration_Euler"><code class="docutils literal notranslate"><span class="pre">predict_concentration_Euler()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#predict.DRL.calculate_step"><code class="docutils literal notranslate"><span class="pre">calculate_step()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#predict.DRL.calculate_jac"><code class="docutils literal notranslate"><span class="pre">calculate_jac()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#example">example</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="optimize.html">Optimize</a></li>
+<li class="toctree-l1"><a class="reference internal" href="visualize.html">Visualize</a></li>
+<li class="toctree-l1"><a class="reference internal" href="extensive_example.html">Extensive example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="design_choices.html">Implementation details</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Delayed-Reactant-Labeling</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Predict</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/predict.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="predict">
+<h1>Predict<a class="headerlink" href="#predict" title="Permalink to this heading"></a></h1>
+<p>The predict module implements the <a class="reference internal" href="#predict.DRL" title="predict.DRL"><code class="xref py py-class docutils literal notranslate"><span class="pre">DRL</span></code></a> class which helps to create a prediction of a chemical
+system. When the prediction fails it raises a <code class="xref py py-exc docutils literal notranslate"><span class="pre">InvalidPredictionError</span></code>. The DRL
+class implements methods to:</p>
+<ol class="arabic simple">
+<li><p><a class="reference internal" href="#predict.DRL.predict_concentration" title="predict.DRL.predict_concentration"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Predict</span> <span class="pre">the</span> <span class="pre">concentrations</span></code></a> for a DRL experiment using the ODE solver (preferred).</p></li>
+<li><p>Predict the concentrations for a DRL experiment using the explicit Euler formula (discouraged).</p></li>
+<li><p>Calculate the change  in chemical concentration as a function of the current concentrations.</p></li>
+<li><p>Calculate the Jacobian, which is required by the ODE solver. This <strong>only</strong> works for reaction where each reaction step is first order in each chemical.</p></li>
+</ol>
+<p>The details how the <a class="reference internal" href="design_choices.html#rate-equations"><span class="std std-ref">rate equations</span></a> and <a class="reference internal" href="design_choices.html#jacobian"><span class="std std-ref">Jacobian matrix</span></a> are calculated can be
+found in the implementation details section.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="predict.DRL">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">predict.</span></span><span class="sig-name descname"><span class="pre">DRL</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">reactions</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rate_constants</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#predict.DRL" title="Permalink to this definition"></a></dt>
+<dd><p>Contains all information required to predict a chemical system’s concentrations over time.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>reactions</strong> (<em>list</em><em>[</em><em>tuple</em><em>[</em><em>str</em><em>, </em><em>list</em><em>[</em><em>str</em><em>]</em><em>, </em><em>list</em><em>[</em><em>str</em><em>]</em><em>]</em><em>]</em>) – A list of each reaction step that describes the total system.
+Each reaction step is a tuple, where the first element is the name of the rate constant.
+The second element contains a list with the names of each reactant.
+The third element contains a list with the names of each product.</p></li>
+<li><p><strong>rate_constants</strong> (<em>dict</em><em>[</em><em>str</em><em>, </em><em>float</em><em>] </em><em>| </em><em>pd.Series</em>) – The rate constants and their respective values.</p></li>
+<li><p><strong>output_order</strong> (<em>list</em><em>[</em><em>str</em><em>]</em>) – The index of the initial concentrations and prediction.
+The order of each chemical must be given.
+If None (default), the order will be alphabetical.</p></li>
+<li><p><strong>verbose</strong> (<em>bool</em>) – If true, it will print store information on the reactions in the model.
+This information is also stored as the attribute ‘reactions_overview’.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Variables<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>reactions_overview</strong> (<em>pd.DataFrame</em>) – If verbose was True upon initialization, this will yield an easier to read overview of the reactions
+in the system. It also shows the value of each rate constant, and not only its name.</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="predict.DRL.predict_concentration">
+<span class="sig-name descname"><span class="pre">predict_concentration</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t_eval_pre</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">t_eval_post</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial_concentrations</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">labeled_concentration</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dilution_factor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">atol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rtol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-10</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#predict.DRL.predict_concentration" title="Permalink to this definition"></a></dt>
+<dd><p>Predicts the concentrations during a DRL experiment.
+It utilizes the ODE solver ‘scipy.integrate.solve_ivp’ with the Radau method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>t_eval_pre</strong> (<em>np.ndarray</em>) – The time steps before the addition of the labeled compound.
+The first element will be the starting time, and the last the time when it ends.
+It can be a 2-cell array.</p></li>
+<li><p><strong>t_eval_post</strong> (<em>np.ndarray</em>) – The time steps after the addition of the labeled compound, that must be evaluated.</p></li>
+<li><p><strong>initial_concentrations</strong> (<em>dict</em><em>[</em><em>str</em><em>, </em><em>float</em><em>]</em>) – The initial concentrations of each chemical.
+Only non-zero concentrations are required.</p></li>
+<li><p><strong>labeled_concentration</strong> (<em>dict</em><em>[</em><em>str</em><em>, </em><em>float</em><em>]</em>) – The concentration of the labeled chemical.
+This concentration is not diluted.</p></li>
+<li><p><strong>dilution_factor</strong> (<em>float</em>) – The factor (≤ 1) by which the prediction will be ‘diluted’ when the labeled chemical is added.</p></li>
+<li><p><strong>atol</strong> (<em>float</em>) – The absolute tolerances for the ODE solver.</p></li>
+<li><p><strong>rtol</strong> (<em>float</em>) – The relative tolerances for the ODE solver.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The predicted concentrations for each time stamp in the t_eval_post array.
+The time array itself will be appended to the DataFrame.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="predict.DRL.predict_concentration_Euler">
+<span class="sig-name descname"><span class="pre">predict_concentration_Euler</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t_eval_pre</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">t_eval_post</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial_concentrations</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">labeled_concentration</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dilution_factor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">steps_per_step</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#predict.DRL.predict_concentration_Euler" title="Permalink to this definition"></a></dt>
+<dd><p>Predicts the concentrations during a DRL experiment.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This method is less accurate and slower compared to using an ODE solver such as implemented
+in <a class="reference internal" href="#predict.DRL.predict_concentration" title="predict.DRL.predict_concentration"><code class="xref py py-meth docutils literal notranslate"><span class="pre">predict_concentration()</span></code></a>.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>t_eval_pre</strong> – The time steps that must be evaluated, before the addition of the labeled compound.</p></li>
+<li><p><strong>t_eval_post</strong> – The time steps that must be evaluated and returned, after the addition of the labeled compound.</p></li>
+<li><p><strong>initial_concentrations</strong> (<em>dict</em><em>[</em><em>str</em><em>, </em><em>float</em><em>]</em>) – The initial concentrations of each chemical.
+Only non-zero concentrations are required.</p></li>
+<li><p><strong>labeled_concentration</strong> (<em>dict</em><em>[</em><em>str</em><em>, </em><em>float</em><em>]</em>) – The concentration of the labeled chemical.
+This concentration is not diluted.</p></li>
+<li><p><strong>dilution_factor</strong> (<em>float</em>) – The factor (&lt;= 1) by which the prediction will be ‘diluted’ when the labeled chemical is added.</p></li>
+<li><p><strong>steps_per_step</strong> – The number of steps
+that should be modeled for each point that is evaluated according to the t_eval arrays.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The prediction of the concentration as a function of time after the addition of the labeled compound.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="predict.DRL.calculate_step">
+<span class="sig-name descname"><span class="pre">calculate_step</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">_</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#predict.DRL.calculate_step" title="Permalink to this definition"></a></dt>
+<dd><p>Calculates the rate of change in the chemical system.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>_</strong> (<em>ndarray</em>) – Time is inputted here by scipy.integrate.solve_ivp,
+but it is not used to calculate the rate of change.</p></li>
+<li><p><strong>y</strong> (<em>ndarray</em>) – The current concentrations of each chemical.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The change in concentration with respect to time.
+This has NOT been multiplied with the change in time yet!</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="predict.DRL.calculate_jac">
+<span class="sig-name descname"><span class="pre">calculate_jac</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">_</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#predict.DRL.calculate_jac" title="Permalink to this definition"></a></dt>
+<dd><p>Calculates the <a class="reference internal" href="design_choices.html#jacobian"><span class="std std-ref">Jacobian</span></a> for the chemical system. This function is required by the stiff ODE solvers, such as
+Radau, in scipy.integrate.solve_ivp.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>_</strong> – Time is inputted here by scipy.integrate.solve_ivp,
+but it is not used to calculate the Jacobian.</p></li>
+<li><p><strong>y</strong> – The current concentrations of each chemical.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The Jacobian.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<section id="example">
+<span id="predictexample"></span><h2>example<a class="headerlink" href="#example" title="Permalink to this heading"></a></h2>
+<p>The simple chemical system:</p>
+<div class="math notranslate nohighlight">
+\[A \xrightarrow{\text{k1}} B \xrightarrow{\text{k2}} C\]</div>
+<p>can be modeled using the <a class="reference internal" href="#predict.DRL" title="predict.DRL"><code class="xref py py-class docutils literal notranslate"><span class="pre">DRL</span></code></a> class. First the reaction scheme should be written in a code
+friendly way:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">reaction1</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;k1&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;A&#39;</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;B&#39;</span><span class="p">])</span>
+<span class="n">reaction2</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;k2&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;B&#39;</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;C&#39;</span><span class="p">])</span>
+<span class="n">reactions</span> <span class="o">=</span> <span class="p">[</span><span class="n">reaction1</span><span class="p">,</span> <span class="n">reaction2</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>Where the first element of each tuple is the name of the corresponding rate constant, the second element is a list
+containing all reactants, and the third element is a list containing all the products. If for example B split into C and
+byproduct D, we could write reaction2 as <code class="docutils literal notranslate"><span class="pre">reaction2</span> <span class="pre">=</span> <span class="pre">('k2',</span> <span class="pre">['B'],</span> <span class="pre">['C',</span> <span class="pre">'D'])</span></code></p>
+<p>Lets assume that we know the rate constants belonging to this reaction.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">rate_constants</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;k1&quot;</span><span class="p">:</span> <span class="mf">0.2</span><span class="p">,</span>
+    <span class="s2">&quot;k2&quot;</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>We can create a prediction using the <a class="reference internal" href="#predict.DRL.predict_concentration" title="predict.DRL.predict_concentration"><code class="xref py py-func docutils literal notranslate"><span class="pre">DRL.predict_concentration()</span></code></a>. The class implements the method which determines
+the rate of change as a function of its current state, and a method which calculates the Jacobian based on its state.
+Because we do not want to model an entire DRL experiment, <code class="docutils literal notranslate"><span class="pre">solve_ivp</span></code> is used instead of <a class="reference internal" href="#predict.DRL.predict_concentration" title="predict.DRL.predict_concentration"><code class="xref py py-func docutils literal notranslate"><span class="pre">DRL.predict_concentration()</span></code></a>.
+Internally, this function also calls <code class="docutils literal notranslate"><span class="pre">solve_ivp</span></code>.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">scipy.integrate</span> <span class="kn">import</span> <span class="n">solve_ivp</span>
+<span class="kn">from</span> <span class="nn">delayed_reactant_labeling.predict</span> <span class="kn">import</span> <span class="n">DRL</span>
+
+<span class="n">time</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="n">num</span><span class="o">=</span><span class="mi">2000</span><span class="p">)</span>  <span class="c1"># desire predictions at these timestamps</span>
+<span class="n">k1</span><span class="p">,</span> <span class="n">k2</span> <span class="o">=</span> <span class="n">rate_constants</span><span class="p">[</span><span class="s1">&#39;k1&#39;</span><span class="p">],</span> <span class="n">rate_constants</span><span class="p">[</span><span class="s1">&#39;k2&#39;</span><span class="p">]</span>
+<span class="n">A0</span> <span class="o">=</span> <span class="mi">1</span>
+
+<span class="n">drl</span> <span class="o">=</span> <span class="n">DRL</span><span class="p">(</span><span class="n">rate_constants</span><span class="o">=</span><span class="n">rate_constants</span><span class="p">,</span> <span class="n">reactions</span><span class="o">=</span><span class="n">reactions</span><span class="p">,</span> <span class="n">output_order</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;A&#39;</span><span class="p">,</span> <span class="s1">&#39;B&#39;</span><span class="p">,</span> <span class="s1">&#39;C&#39;</span><span class="p">],</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">solve_ivp</span><span class="p">(</span>
+    <span class="n">drl</span><span class="o">.</span><span class="n">calculate_step</span><span class="p">,</span>
+    <span class="n">t_span</span><span class="o">=</span><span class="p">[</span><span class="n">time</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">time</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]],</span>
+    <span class="n">y0</span><span class="o">=</span><span class="p">[</span><span class="n">A0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+    <span class="n">method</span><span class="o">=</span><span class="s1">&#39;Radau&#39;</span><span class="p">,</span>
+    <span class="n">t_eval</span><span class="o">=</span><span class="n">time</span><span class="p">,</span>
+    <span class="n">jac</span><span class="o">=</span><span class="n">drl</span><span class="o">.</span><span class="n">calculate_jac</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>However, also algebraic <a class="reference external" href="https://chem.libretexts.org/Bookshelves/Physical_and_Theoretical_Chemistry_Textbook_Maps/Mathematical_Methods_in_Chemistry_(Levitus)/04%3A_First_Order_Ordinary_Differential_Equations/4.03%3A_Chemical_Kinetics">solutions</a>
+for this specific chemical problem exist.</p>
+<div class="math notranslate nohighlight">
+ \begin{eqnarray}
+ [A]_t = [A]_0 \cdot e^{-k_1t}
+ \end{eqnarray}
+ \begin{eqnarray}
+ [B]_t = \frac{k_1}{k_2-k_1}[A]_0(e^{-k_1t}-e^{-k_2t})
+ \end{eqnarray}
+ \begin{eqnarray}
+ [C]_t = [A]_0[1-e^{-k_1t}-\frac{k_1}{k_2-k_1}(e^{-k_1t}-e^{-k_2t})]
+ \end{eqnarray}</div><p>We can compare the algebraic solution to the modelled prediction as follows.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="n">kinetic_A</span> <span class="o">=</span> <span class="n">A0</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">k1</span> <span class="o">*</span> <span class="n">time</span><span class="p">)</span>
+<span class="n">kinetic_B</span> <span class="o">=</span> <span class="n">k1</span> <span class="o">/</span> <span class="p">(</span><span class="n">k2</span> <span class="o">-</span> <span class="n">k1</span><span class="p">)</span> <span class="o">*</span> <span class="n">A0</span> <span class="o">*</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">k1</span> <span class="o">*</span> <span class="n">time</span><span class="p">)</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">k2</span> <span class="o">*</span> <span class="n">time</span><span class="p">))</span>
+<span class="n">kinetic_C</span> <span class="o">=</span> <span class="n">A0</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">k1</span> <span class="o">*</span> <span class="n">time</span><span class="p">)</span> <span class="o">-</span> <span class="n">k1</span> <span class="o">/</span> <span class="p">(</span><span class="n">k2</span> <span class="o">-</span> <span class="n">k1</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">k1</span> <span class="o">*</span> <span class="n">time</span><span class="p">)</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">k2</span> <span class="o">*</span> <span class="n">time</span><span class="p">)))</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">()</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">y</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="n">A0</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;A&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">y</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="n">A0</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;B&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">y</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">/</span> <span class="n">A0</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;C&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">kinetic_A</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;k&#39;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s1">&#39;:&#39;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;algebraic&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">kinetic_B</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;k&#39;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s1">&#39;:&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">kinetic_C</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;k&#39;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s1">&#39;:&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="_images/predict_prediction.png"><img alt="_images/predict_prediction.png" class="align-center" src="_images/predict_prediction.png" style="width: 600px;" /></a>
+<p>It is clear that the model fits the data very well. Besides, it’s much easier to implement these few lines of code, instead of
+doing the mathematics. Furthermore, implementing more difficult problems only requires the addition of a few lines here,
+whereas solving the problem in an exact manner might become impossible.</p>
+<p>This current system can also be converted to a DRL experiment by adding a labeled reactant A at a certain timestamp.
+This labeled reactant reacts in a identical manner to A, except that the corresponding products are also labeled.
+It could be implemented as follows:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">reaction3</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;k1&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;A-labeled&#39;</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;B-labeled&#39;</span><span class="p">])</span>
+<span class="n">reaction4</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;k2&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;B-labeled&#39;</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;C-labeled&#39;</span><span class="p">])</span>
+<span class="n">reactions</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">reaction3</span><span class="p">,</span> <span class="n">reaction4</span><span class="p">])</span>
+
+<span class="n">drl</span> <span class="o">=</span> <span class="n">DRL</span><span class="p">(</span><span class="n">reactions</span><span class="o">=</span><span class="n">reactions</span><span class="p">,</span> <span class="n">rate_constants</span><span class="o">=</span><span class="n">rate_constants</span><span class="p">)</span>
+<span class="n">prediction</span> <span class="o">=</span> <span class="n">drl</span><span class="o">.</span><span class="n">predict_concentration</span><span class="p">(</span>
+    <span class="n">t_eval_pre</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">2.5</span><span class="p">,</span> <span class="mi">2500</span><span class="p">),</span>
+    <span class="n">t_eval_post</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">2.5</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">17500</span><span class="p">),</span>
+    <span class="n">initial_concentrations</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span>
+    <span class="n">labeled_concentration</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A-labeled&quot;</span><span class="p">:</span> <span class="mf">0.8</span><span class="p">},</span>
+    <span class="n">dilution_factor</span><span class="o">=</span><span class="mf">0.8</span>
+<span class="p">)</span>
+<span class="n">ax</span> <span class="o">=</span> <span class="n">prediction</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="s1">&#39;time&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;time&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;concentration&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">figure</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="_images/predict_drl_prediction.png"><img alt="_images/predict_drl_prediction.png" class="align-center" src="_images/predict_drl_prediction.png" style="width: 600px;" /></a>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="installation.html" class="btn btn-neutral float-left" title="Getting started" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="optimize.html" class="btn btn-neutral float-right" title="Optimize" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Martijn Dingemans.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

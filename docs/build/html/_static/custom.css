@@ -1,0 +1,16 @@
+.wy-nav-content {
+    min-width: 800px !important;
+    max-width: 1200px !important;
+}
+
+.wy-menu-vertical li.toctree-l3 {
+    font-size: 1em !important;
+}
+
+.rst-content code, .rst-content tt, code {
+    font-size: 100% !important;
+}
+
+span.eqno {
+    float: right !important;
+}

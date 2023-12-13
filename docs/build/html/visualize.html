@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Visualize &mdash; Delayed-Reactant-Labeling 0.2.5 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/copybutton.css" type="text/css" />
+      <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=e9ffd43a"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=4825356b"></script>
+        <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+        <script src="_static/copybutton.js?v=f281be69"></script>
+        <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Extensive example" href="extensive_example.html" />
+    <link rel="prev" title="Optimize" href="optimize.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Delayed-Reactant-Labeling
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="predict.html">Predict</a></li>
+<li class="toctree-l1"><a class="reference internal" href="optimize.html">Optimize</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Visualize</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#visualize.VisualizeModel"><code class="docutils literal notranslate"><span class="pre">VisualizeModel</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#visualize.VisualizeModel.save_image"><code class="docutils literal notranslate"><span class="pre">save_image()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#visualize.VisualizeModel.plot_optimization_progress"><code class="docutils literal notranslate"><span class="pre">plot_optimization_progress()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#visualize.VisualizeModel.plot_grouped_by"><code class="docutils literal notranslate"><span class="pre">plot_grouped_by()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#visualize.VisualizeModel.plot_path_in_pca"><code class="docutils literal notranslate"><span class="pre">plot_path_in_pca()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#visualize.VisualizeModel.plot_enantiomer_ratio"><code class="docutils literal notranslate"><span class="pre">plot_enantiomer_ratio()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#visualize.VisualizeModel.plot_rate_over_time"><code class="docutils literal notranslate"><span class="pre">plot_rate_over_time()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#visualize.VisualizeModel.plot_rate_sensitivity"><code class="docutils literal notranslate"><span class="pre">plot_rate_sensitivity()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#visualize.VisualizeModel.plot_error_all_runs"><code class="docutils literal notranslate"><span class="pre">plot_error_all_runs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#visualize.VisualizeModel.plot_ratio_all_runs"><code class="docutils literal notranslate"><span class="pre">plot_ratio_all_runs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#visualize.VisualizeModel.plot_x_all_runs"><code class="docutils literal notranslate"><span class="pre">plot_x_all_runs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#visualize.VisualizeModel.plot_biplot_all_runs"><code class="docutils literal notranslate"><span class="pre">plot_biplot_all_runs()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="extensive_example.html">Extensive example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="design_choices.html">Implementation details</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Delayed-Reactant-Labeling</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Visualize</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/visualize.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="visualize">
+<h1>Visualize<a class="headerlink" href="#visualize" title="Permalink to this heading"></a></h1>
+<p>To visualize the data effectively several plotting functions have been created.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Please see the <a class="reference internal" href="extensive_example.html#extensivevisuals"><span class="std std-ref">extensive example</span></a> for some examples on how to use this module.</p>
+</div>
+<dl class="py class">
+<dt class="sig sig-object py" id="visualize.VisualizeModel">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">visualize.</span></span><span class="sig-name descname"><span class="pre">VisualizeModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">models</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rate_constant_optimizer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hide_params</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dpi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">600</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extensions</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">overwrite_image</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#visualize.VisualizeModel" title="Permalink to this definition"></a></dt>
+<dd><p>Contains several methods which help creating plots. The methods are split into three main groups:</p>
+<ol class="arabic simple">
+<li><p>Visualization of <a class="reference internal" href="optimize.html#optimize.OptimizedModel" title="optimize.OptimizedModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">OptimizedModels</span></code></a></p></li>
+<li><p>Visualization of <code class="xref py py-class docutils literal notranslate"><span class="pre">OptimizedMultipleModels</span></code></p></li>
+<li><p>Visualization of other data that is provided by the user.</p></li>
+</ol>
+<p>Each method will save the figure where the name is equal to the function name.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>image_path</strong> (<em>str</em><em> | </em><em>pathlib.Path</em>) – The path to the folder where the created images should be stored.</p></li>
+<li><p><strong>model</strong> (<em>Optional</em><em>[</em><a class="reference internal" href="optimize.html#optimize.OptimizedModel" title="optimize.OptimizedModel"><em>OptimizedModel</em></a><em>]</em>) – A single optimized model of which plots should be created.
+If None, and models is not None, the best model in models will be used instead.
+This will issue a warning once.</p></li>
+<li><p><strong>models</strong> (<em>Optional</em><em>[</em><a class="reference internal" href="optimize.html#optimize.OptimizedMultipleModels" title="optimize.OptimizedMultipleModels"><em>OptimizedMultipleModels</em></a><em>]</em>) – Multiple optimized models of which plots should be created. If model is None,
+the best model in models will be used instead.</p></li>
+<li><p><strong>rate_constant_optimizer</strong> (<em>Optional</em><em>[</em><a class="reference internal" href="optimize.html#optimize.RateConstantOptimizerTemplate" title="optimize.RateConstantOptimizerTemplate"><em>RateConstantOptimizerTemplate</em></a><em>]</em>) – The user implemented class of <a class="reference internal" href="optimize.html#optimize.RateConstantOptimizerTemplate" title="optimize.RateConstantOptimizerTemplate"><code class="xref py py-class docutils literal notranslate"><span class="pre">optimize.RateConstantOptimizerTemplate</span></code></a>.
+Required by some functions.</p></li>
+<li><p><strong>plot_title</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em>) – The title (plt.Figure.suptitle) that will be given to each plot.
+If None (default), no title will be given.</p></li>
+<li><p><strong>hide_params</strong> (<em>Optional</em><em>[</em><em>np.ndarray</em><em>]</em>) – A boolean array, which indicate if the respective parameter should be hidden
+If None (default), all parameters will be shown.</p></li>
+<li><p><strong>dpi</strong> (<em>int</em>) – The ‘density per inch’ that will be used when saving the images.</p></li>
+<li><p><strong>extensions</strong> (<em>Optional</em><em>[</em><em>Iterable</em><em>[</em><em>str</em><em>] </em><em>| </em><em>str</em><em>]</em>) – The file format(s) to which the image will be saved.</p></li>
+<li><p><strong>overwrite_image</strong> (<em>bool</em>) – If false (default), an FileExistsError will be raised if the image already exists.
+If true, the image will be overwritten.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>FileExistError</strong> – Raised if the image already exists.</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="visualize.VisualizeModel.save_image">
+<span class="sig-name descname"><span class="pre">save_image</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fig</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tight_layout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#visualize.VisualizeModel.save_image" title="Permalink to this definition"></a></dt>
+<dd><p>Saves an image with all relevant extensions, and the correct dpi.
+It will be stored in the folder, specified by the <code class="docutils literal notranslate"><span class="pre">image_path</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fig</strong> – The figure that is to be saved.</p></li>
+<li><p><strong>file_name</strong> – The file name for the figure.</p></li>
+<li><p><strong>tight_layout</strong> – If fig.tight_layout() should be called.
+Does not work with <code class="docutils literal notranslate"><span class="pre">plot_path_in_pca</span></code>.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="visualize.VisualizeModel.plot_optimization_progress">
+<span class="sig-name descname"><span class="pre">plot_optimization_progress</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ratio</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_points</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">fig_kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#visualize.VisualizeModel.plot_optimization_progress" title="Permalink to this definition"></a></dt>
+<dd><p>Shows the error as function of the iteration number.</p>
+<p><strong>requires a single model</strong></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>file_name</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em>) – The file name for the image. This should not include any extension.
+If None (default), it is equal to ‘plot_optimization_progress’.</p></li>
+<li><p><strong>ratio</strong> (<em>Optional</em><em>[</em><em>tuple</em><em>[</em><em>str</em><em>, </em><em>list</em><em>[</em><em>str</em><em>]</em><em>]</em><em>]</em>) – If None (default), only the error ratio will be shown.
+If given, the first element indicates the chemical of interest, and the second element the chemicals it is
+compared to. For example (‘A’, [‘A’, ‘B’]), calculates <span class="math notranslate nohighlight">\(A / (A+B)\)</span>.
+It will plot the ratio for the last point in each prediction.</p></li>
+<li><p><strong>n_points</strong> (<em>int</em>) – The number of iterations for which the ratio will be re-calculated.
+These are uniformly distributed over all possible iterations.</p></li>
+<li><p><strong>**fig_kwargs</strong> – Additional keyword arguments that are passed on to plt.subplots().</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>tuple[plt.Figure, plt.Axes]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="visualize.VisualizeModel.plot_grouped_by">
+<span class="sig-name descname"><span class="pre">plot_grouped_by</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group_by</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_remaining</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xtick_rotation</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">fig_kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#visualize.VisualizeModel.plot_grouped_by" title="Permalink to this definition"></a></dt>
+<dd><p>Plots a bar plot of the data in args, and allows easy grouping with respect to their index.
+For example, plot_grouped_by(x1, x2) would create a bar plot of the two series,
+where, for each parameter, the values in x1 and x2 would be compared.</p>
+<p><strong>requires no model</strong></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>*args</strong> (<em>pd.Series</em>) – The data that should be plotted.
+The name of each pd.Series will be used in the legend.
+The index of the first pd.Series object will be used to sort the groups with.</p></li>
+<li><p><strong>file_name</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em>) – The file name for the image. This should not include any extension.
+If None (default), it is equal to ‘plot_grouped_by’.</p></li>
+<li><p><strong>group_by</strong> (<em>Optional</em><em>[</em><em>list</em><em>[</em><em>str</em><em>]</em><em>]</em>) – Group the parameters by a key.
+Each parameter can only be matched with one key exactly.</p></li>
+<li><p><strong>show_remaining</strong> (<em>bool</em>) – Show the parameters which were not matched by any key in group_as.</p></li>
+<li><p><strong>xtick_rotation</strong> (<em>float</em>) – The rotation of the x ticks in degrees.</p></li>
+<li><p><strong>**fig_kwargs</strong> – Additional keyword arguments that are passed on to plt.subplots().</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>tuple[plt.Figure, np.ndarray[plt.Axes]]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="visualize.VisualizeModel.plot_path_in_pca">
+<span class="sig-name descname"><span class="pre">plot_path_in_pca</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pc1</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pc2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">fig_kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#visualize.VisualizeModel.plot_path_in_pca" title="Permalink to this definition"></a></dt>
+<dd><p>Plots the path in the dimensionally reduced space (by means of principal component analysis).
+The data is standard-scaled (mean=0, std=1) before any analysis,
+to ensure that it is not the scale of a parameter, but its deviation, which impacts the plot.</p>
+<p><strong>requires a single model</strong></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>file_name</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em>) – The file name for the image. This should not include any extension.
+If None (default), it is equal to ‘plot_path_in_pca’.</p></li>
+<li><p><strong>pc1</strong> (<em>int</em>) – The principal components that should be plotted against each other.</p></li>
+<li><p><strong>pc2</strong> (<em>int</em>) – The principal components that should be plotted against each other.</p></li>
+<li><p><strong>**fig_kwargs</strong> – Additional keyword arguments that are passed on to plt.Figure().</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The figure, and axes of the plot. Axes[0] is the main plot, axes[1] describes the loadings
+of PC1, whereas axes[2] describes the loadings of PC2.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple[plt.Figure, np.ndarray[plt.Axes]]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="visualize.VisualizeModel.plot_enantiomer_ratio">
+<span class="sig-name descname"><span class="pre">plot_enantiomer_ratio</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">group_by</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ratio_of</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">experimental</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prediction</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_N</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">warn_label_assumption</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">fig_kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#visualize.VisualizeModel.plot_enantiomer_ratio" title="Permalink to this definition"></a></dt>
+<dd><p>Groups the data (experimental or predicted), and calculates the fraction each chemical contributes to the
+total sum. E.g. group_as=[‘1’, ‘2’] and ratio_of=[‘A’, ‘B’, ‘C’] would look for hits with respect to those keys,
+and one of the calculated data points would be: 1_A / (1_A + 1_B + 1_C)</p>
+<p><strong>requires a single model</strong></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>group_by</strong> (<em>list</em><em>[</em><em>str</em><em>]</em>) – Groups the data by a key.
+Each index can only be matched with one key exactly.</p></li>
+<li><p><strong>ratio_of</strong> (<em>list</em><em>[</em><em>str</em><em>]</em>) – Calculate the fraction each chemical contributes to the total sum of all chemicals in this group.</p></li>
+<li><p><strong>experimental</strong> (<em>pd.DataFrame</em>) – The experimental data of the experiment.</p></li>
+<li><p><strong>prediction</strong> (<em>pd.DataFrame</em>) – The predicted data. This is not computed within the class to allow the user to specify the indices
+of the prediction in more detail.</p></li>
+<li><p><strong>last_N</strong> (<em>int</em>) – The number of points counting from the end will be used to calculate the average ratio with.</p></li>
+<li><p><strong>file_name</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em>) – The file name for the image. This should not include any extension.
+If None (default), it is equal to ‘plot_enantiomer_ratio’.</p></li>
+<li><p><strong>warn_label_assumption</strong> (<em>bool</em>) – If true (default), a warning will be issued when exactly two matches are found for each combination of the
+elements in group_as and ratio_of. This can be caused by e.g. both ‘3’ and ‘D’ being present in the strings
+“3_bla_D” and “3_bla_D-custom_label”. To resolve this tie the shorted string will be used as it is most
+likely to be the non-labeled compound.</p></li>
+<li><p><strong>**fig_kwargs</strong> – Additional keyword arguments that are passed on to plt.subplots().</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>tuple[plt.Figure, plt.Axes]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="visualize.VisualizeModel.plot_rate_over_time">
+<span class="sig-name descname"><span class="pre">plot_rate_over_time</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_min</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_max</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_scale</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">fig_kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#visualize.VisualizeModel.plot_rate_over_time" title="Permalink to this definition"></a></dt>
+<dd><p>Plots the parameters, x, as a function of time.</p>
+<p><strong>requires a single model</strong></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>file_name</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em>) – The file name for the image. This should not include any extension.
+If None (default), it is equal to ‘plot_rate_over_time’.</p></li>
+<li><p><strong>x_min</strong> (<em>Optional</em><em>[</em><em>float</em><em>]</em>) – The values smaller than x_min will be plotted as x_min.</p></li>
+<li><p><strong>x_max</strong> (<em>Optional</em><em>[</em><em>float</em><em>]</em>) – The values larger than x_max will be plotted as x_max.</p></li>
+<li><p><strong>log_scale</strong> (<em>bool</em>) – If true the data will be plotted on log_scale.</p></li>
+<li><p><strong>**fig_kwargs</strong> – Additional keyword arguments that are passed on to plt.subplots().</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>tuple[plt.Figure, plt.Axes]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="visualize.VisualizeModel.plot_rate_sensitivity">
+<span class="sig-name descname"><span class="pre">plot_rate_sensitivity</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x_min</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_max</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_error</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">steps</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">101</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">fig_kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#visualize.VisualizeModel.plot_rate_sensitivity" title="Permalink to this definition"></a></dt>
+<dd><p>Plot the sensitivity of each parameter, x, to modifications. Only a single parameter is modified at once.</p>
+<p><strong>requires a single model</strong></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x_min</strong> (<em>float</em>) – The minimum value of x.</p></li>
+<li><p><strong>x_max</strong> (<em>float</em>) – The maximum value of x.</p></li>
+<li><p><strong>file_name</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em>) – The file name for the image. This should not include any extension.
+If None (default), it is equal to ‘plot_rate_sensitivity’.</p></li>
+<li><p><strong>max_error</strong> (<em>Optional</em><em>[</em><em>float</em><em>]</em>) – All values larger the maximum value will be plotted as the maximum error.
+If None (default), 3 times the lowest value error will be used.</p></li>
+<li><p><strong>steps</strong> (<em>int</em>) – The number of different values that will be modeled for each parameter.</p></li>
+<li><p><strong>**fig_kwargs</strong> – Additional keyword arguments that are passed on to plt.subplots().</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>tuple[plt.Figure, plt.Axes]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="visualize.VisualizeModel.plot_error_all_runs">
+<span class="sig-name descname"><span class="pre">plot_error_all_runs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">top_n</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">fig_kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#visualize.VisualizeModel.plot_error_all_runs" title="Permalink to this definition"></a></dt>
+<dd><p>Plots the error of each model.</p>
+<p><strong>requires multiple model</strong></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>top_n</strong> (<em>Optional</em><em>[</em><em>int</em><em>]</em>) – How many of the best runs should be plotted.
+If None (default), all runs will be plotted.</p></li>
+<li><p><strong>file_name</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em>) – The file name for the image. This should not include any extension.
+If None (default), it is equal to ‘plot_error_all_runs’.</p></li>
+<li><p><strong>**fig_kwargs</strong> – Additional keyword arguments that are passed on to plt.subplots().</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>tuple[plt.Figure, plt.Axes]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="visualize.VisualizeModel.plot_ratio_all_runs">
+<span class="sig-name descname"><span class="pre">plot_ratio_all_runs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ratio</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">top_n</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">20</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">fig_kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#visualize.VisualizeModel.plot_ratio_all_runs" title="Permalink to this definition"></a></dt>
+<dd><p>Plots the expected ratio with respect to each model, which are sorted on their performance.</p>
+<p><strong>requires multiple model</strong></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ratio</strong> (<em>tuple</em><em>[</em><em>str</em><em>, </em><em>list</em><em>[</em><em>str</em><em>]</em><em>]</em>) – The first element indicates the chemical of interest,
+and the second element the chemicals it is compared to.
+For example (‘A’, [‘A’, ‘B’]), calculates <span class="math notranslate nohighlight">\(A/(A+B)\)</span>.
+It will plot the ratio for the last time point in each model.</p></li>
+<li><p><strong>top_n</strong> (<em>Optional</em><em>[</em><em>int</em><em>]</em>) – How many of the best runs should be plotted.</p></li>
+<li><p><strong>file_name</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em>) – The file name for the image. This should not include any extension.
+If None (default), it is equal to ‘plot_ratio_all_runs’.</p></li>
+<li><p><strong>**fig_kwargs</strong> – Additional keyword arguments that are passed on to plt.subplots().</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>tuple[plt.Figure, plt.Axes]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="visualize.VisualizeModel.plot_x_all_runs">
+<span class="sig-name descname"><span class="pre">plot_x_all_runs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">index</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">fig_kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#visualize.VisualizeModel.plot_x_all_runs" title="Permalink to this definition"></a></dt>
+<dd><p>Plots a boxplot of the parameters for the selected runs.</p>
+<p><strong>requires multiple model</strong></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>index</strong> (<em>slice</em>) – The indices of the runs for which the parameters should be plotted.
+index=slice(1, 5) would plot the results of runs 1 upto and including 4,
+but the best run (0) would be skipped.
+index=slice(-5, None) would plot the results for the 5 worst models.</p></li>
+<li><p><strong>file_name</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em>) – The file name for the image. This should not include any extension.
+If None (default), it is equal to ‘plot_x_all_runs’.</p></li>
+<li><p><strong>**fig_kwargs</strong> – Additional keyword arguments that are passed on to plt.subplots().</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>tuple[plt.Figure, plt.Axes]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="visualize.VisualizeModel.plot_biplot_all_runs">
+<span class="sig-name descname"><span class="pre">plot_biplot_all_runs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">index</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pc1</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pc2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">fig_kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#visualize.VisualizeModel.plot_biplot_all_runs" title="Permalink to this definition"></a></dt>
+<dd><p>Plots a biplot of the initial and optimal parameters per run.
+This is a dimensionally reduced PCA plot, where the loadings and scores are plotted simultaneously.
+The data is standard-scaled (mean=0, std=1) before any analysis,
+to ensure that it is not the scale of a parameter, but its deviation, which impacts the plot.</p>
+<p><strong>requires multiple model</strong></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>index</strong> (<em>slice</em>) – The indices of the runs, when sorted by error, for which the parameters should be plotted.
+index=slice(1, 5) would plot the results of runs 1 upto and including 4,
+but the best run (0) would be skipped.
+index=slice(-5, None) would plot the results for the 5 worst models.</p></li>
+<li><p><strong>pc1</strong> (<em>int</em>) – The principal components that should be plotted against each other.</p></li>
+<li><p><strong>pc2</strong> (<em>int</em>) – The principal components that should be plotted against each other.</p></li>
+<li><p><strong>file_name</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em>) – The file name for the image. This should not include any extension.
+If None (default), it is equal to ‘plot_biplot_all_runs’.</p></li>
+<li><p><strong>**fig_kwargs</strong> – Additional keyword arguments that are passed on to plt.subplots().</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>tuple[plt.Figure, plt.Axes]</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="optimize.html" class="btn btn-neutral float-left" title="Optimize" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="extensive_example.html" class="btn btn-neutral float-right" title="Extensive example" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Martijn Dingemans.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
