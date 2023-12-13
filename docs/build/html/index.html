@@ -80,16 +80,17 @@
              
   <section id="delayed-reactant-labeling">
 <h1>Delayed-reactant-labeling<a class="headerlink" href="#delayed-reactant-labeling" title="Permalink to this heading"></a></h1>
-<p><strong>Delayed Reactant Labeling</strong> (DRL) is a method which allows kinetic information to be
-extracted from experiments on a mass spectrometer. This package allows for easy analysis
-of such experimental data.</p>
+<p><strong>Delayed Reactant Labeling</strong> (DRL) is a method which allows kinetic information to be extracted from experiments on a
+mass spectrometer. By coupling the mass spectrometer to a TIMS unit, also different diastereomers can be modeled.</p>
+<p>This module can:</p>
+<ol class="lowerroman simple">
+<li><p>extract the rate equations of a chemical system from the reaction steps,</p></li>
+<li><p>model the rate equations using a Radau ODE solver, to ensure accuracy and efficiency of the model,</p></li>
+<li><p>use the Nelder-Mead algorithm with adapted parameters to find an optimal solution in a highly dimensional space,</p></li>
+<li><p>perform multiple analyses of a system from different starting positions and,</p></li>
+<li><p>visualize the model in different ways.</p></li>
+</ol>
 <p>To get started check out the <a class="reference internal" href="installation.html"><span class="doc">Getting started</span></a> section for further information.</p>
-<p>To create a prediction of the concentration of each chemical as a function of time the
-<a class="reference internal" href="predict.html#predict.DRL" title="predict.DRL"><code class="xref py py-class docutils literal notranslate"><span class="pre">predict.DRL</span></code></a> class can be used.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>This project is under active development.</p>
-</div>
 <section id="contents">
 <h2>Contents<a class="headerlink" href="#contents" title="Permalink to this heading"></a></h2>
 <div class="toctree-wrapper compound">

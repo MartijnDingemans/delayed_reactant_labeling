@@ -12,6 +12,6 @@ iii) use the Nelder-Mead algorithm with adapted parameters to find an optimal so
 iv) perform multiple analyses of a system from different starting positions and,
 v) visualize the model in different ways.
 
-Detailed documentation is available in the docs/build/html folder, which can be downloaded. The html files can be
-opened in any browser.
+Detailed documentation is available from https://delayed-reactant-labeling.readthedocs.io/en/latest/index.html and
+in the docs/build/html folder, which can be downloaded. The html files can be opened in any browser.
 
