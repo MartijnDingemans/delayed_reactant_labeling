@@ -259,6 +259,88 @@ class DRL:
 
         return df_result_post
 
+    def predict_concentration_full(self,
+                              t_eval_pre: np.ndarray,
+                              t_eval_post: np.ndarray,
+                              initial_concentrations: dict[str, float],
+                              labeled_concentration: dict[str, float],
+                              dilution_factor: float,
+                              atol: float = 1e-10,
+                              rtol: float = 1e-10) -> pd.DataFrame:
+        """Predicts the concentrations during a DRL experiment.
+        It utilizes the ODE solver 'scipy.integrate.solve_ivp' with the Radau method.
+
+        Args
+        ----
+        t_eval_pre
+            The time steps before the addition of the labeled compound.
+            The first element will be the starting time, and the last the time when it ends.
+            It can be a 2-cell array.
+        t_eval_post
+            The time steps after the addition of the labeled compound, that must be evaluated.
+        initial_concentrations
+            The initial concentrations of each chemical.
+            Only non-zero concentrations are required.
+        labeled_concentration
+            The concentration of the labeled chemical.
+            This concentration is not diluted.
+        dilution_factor
+            The factor (≤ 1) by which the prediction will be 'diluted' when the labeled chemical is added.
+        atol
+            The absolute tolerances for the ODE solver.
+        rtol
+            The relative tolerances for the ODE solver.
+
+        Returns
+        -------
+        pd.DataFrame
+            The predicted concentrations for each time stamp in the t_eval_post array.
+            The time array itself will be appended to the DataFrame.
+        """
+        # modify the stored initial concentration to match with input.
+        for chemical, initial_concentration in initial_concentrations.items():
+            self.initial_concentrations[self.reference[chemical]] = initial_concentration
+
+        result_pre = solve_ivp(self.calculate_step,
+                               t_span=[t_eval_pre[0], t_eval_pre[-1]],
+                               t_eval=t_eval_pre,
+                               y0=self.initial_concentrations,
+                               jac=self.calculate_jac,
+                               method='Radau',
+                               atol=atol,
+                               rtol=rtol)
+        df_result_pre = pd.DataFrame(result_pre.y.T, columns=list(self.reference.keys()))
+        df_result_pre['time'] = result_pre.t
+
+        # dilution step
+        diluted_concentrations = result_pre.y[:, -1] * dilution_factor  # result.y is transposed
+        for chemical, concentration in labeled_concentration.items():
+            diluted_concentrations[self.reference[chemical]] = concentration
+
+        # post addition
+        result_post = solve_ivp(self.calculate_step,
+                                t_span=[t_eval_post[0], t_eval_post[-1]],
+                                t_eval=t_eval_post,
+                                y0=diluted_concentrations,
+                                method='Radau',
+                                jac=self.calculate_jac,
+                                atol=atol,
+                                rtol=rtol)
+        df_result_post = pd.DataFrame(result_post.y.T, columns=list(self.reference.keys()))
+        df_result_post['time'] = result_post.t
+
+        # validate the results
+        if result_post.y.min() < -max([atol, rtol]):  # errors up to the given tolerance are allowed.
+            raise InvalidPredictionError(
+                f"Negative concentrations (min: {result_post.y.min():6e}) were detected. "
+                f"The applied rate constants are:\n {self.rate_constants_input.to_json()}")
+        if df_result_post.tail(1).isna().values.any():
+            raise InvalidPredictionError(
+                f"NaN values (count: {df_result_post.isna().sum(axis=0)}) were detected. "
+                f"The applied rate constants are:\n {self.rate_constants_input.to_json()}")
+
+        return pd.concat([df_result_pre, df_result_post], axis=0)
+
     def _predict_slice_Euler(self,
                              initial_concentration: np.ndarray,
                              time_slice: np.ndarray,
